@@ -52,7 +52,7 @@ public class HelloController {
     }
 
     public Integer consumer(String interfaceName,String method,String parameterTypesString,String parameter) throws Exception {
-
+        //logger.info("consumer:{}, {}, {}, {}", interfaceName, method, parameterTypesString, parameter);
         if (null == endpoints){
             synchronized (lock){
                 if (null == endpoints){

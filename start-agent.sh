@@ -1,8 +1,11 @@
 #!/bin/bash
 
-ETCD_HOST=$(ip addr show docker0 | grep 'inet\b' | awk '{print $2}' | cut -d '/' -f 1)
-ETCD_PORT=2379
-ETCD_URL=http://$ETCD_HOST:$ETCD_PORT
+if [ $ETCD_URL == "" ]; then
+    ETCD_HOST=$(ip addr show docker0 | grep 'inet\b' | awk '{print $2}' | cut -d '/' -f 1)
+    ETCD_PORT=2379
+    ETCD_URL=http://$ETCD_HOST:$ETCD_PORT
+fi
+
 
 echo ETCD_URL = $ETCD_URL
 
