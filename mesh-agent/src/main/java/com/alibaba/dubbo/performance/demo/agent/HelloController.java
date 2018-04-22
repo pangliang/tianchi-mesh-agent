@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.io.IOException;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
 public class HelloController {
@@ -23,11 +23,12 @@ public class HelloController {
     private IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
 
     private RpcClient rpcClient = new RpcClient(registry);
-    private Random random = new Random();
     private List<Endpoint> endpoints = null;
     private Object lock = new Object();
     private OkHttpClient httpClient = new OkHttpClient();
+    private AtomicInteger endPointIndex = new AtomicInteger(0);
 
+    private AtomicInteger activeClient = new AtomicInteger(0);
 
     @RequestMapping(value = "")
     public Object invoke(@RequestParam("interface") String interfaceName,
@@ -57,12 +58,32 @@ public class HelloController {
             synchronized (lock){
                 if (null == endpoints){
                     endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
+                    logger.info("endpoints: {}", endpoints);
                 }
             }
         }
 
-        // 简单的负载均衡，随机取一个
-        Endpoint endpoint = endpoints.get(random.nextInt(endpoints.size()));
+        //// 轮询
+        int index = endPointIndex.addAndGet(1);
+        Endpoint endpoint = endpoints.get(index % endpoints.size());
+
+        int clients = activeClient.addAndGet(1);
+
+        // qps 能力
+        double qps = 0;
+        for(Endpoint e: endpoints){
+            qps += e.qps();
+        }
+        for(Endpoint e: endpoints){
+            logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+            if(e.getActive() < (clients * (e.qps()/qps))){
+                endpoint = e;
+                break;
+            }
+        }
+
+        endpoint.start();
+        long start = System.nanoTime();
 
         String url =  "http://" + endpoint.getHost() + ":" + endpoint.getPort();
 
@@ -79,6 +100,12 @@ public class HelloController {
                 .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
+
+            activeClient.decrementAndGet();
+
+            long elapsed = System.nanoTime() - start;
+            endpoint.finish(elapsed);
+
             if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
             byte[] bytes = response.body().bytes();
             String s = new String(bytes);
