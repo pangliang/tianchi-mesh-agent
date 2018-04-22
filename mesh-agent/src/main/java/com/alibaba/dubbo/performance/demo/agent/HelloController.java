@@ -75,7 +75,7 @@ public class HelloController {
             qps += e.qps();
         }
         for(Endpoint e: endpoints){
-            //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+            logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
             if(e.getActive() < (clients * (e.qps()/qps))){
                 endpoint = e;
                 break;
