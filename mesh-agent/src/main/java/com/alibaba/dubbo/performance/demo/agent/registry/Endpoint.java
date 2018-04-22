@@ -54,7 +54,7 @@ public class Endpoint {
 
     public double qps(){
         if(this.times.longValue() == 0 || this.elapsed.doubleValue() == 0){
-            return 10000;
+            return 1;
         }
         return this.times.longValue()/(this.elapsed.doubleValue()/TimeUnit.SECONDS.toNanos(1));
     }

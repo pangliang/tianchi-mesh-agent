@@ -75,7 +75,7 @@ public class HelloController {
             qps += e.qps();
         }
         for(Endpoint e: endpoints){
-            logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+            //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
             if(e.getActive() < (clients * (e.qps()/qps))){
                 endpoint = e;
                 break;
@@ -100,9 +100,6 @@ public class HelloController {
                 .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
-
-            activeClient.decrementAndGet();
-
             long elapsed = System.nanoTime() - start;
             endpoint.finish(elapsed);
 
@@ -110,6 +107,8 @@ public class HelloController {
             byte[] bytes = response.body().bytes();
             String s = new String(bytes);
             return Integer.valueOf(s);
+        }finally {
+            activeClient.decrementAndGet();
         }
     }
 }
