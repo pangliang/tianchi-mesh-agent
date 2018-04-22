@@ -6,12 +6,21 @@ if [[ $ETCD_URL == "" ]]; then
     ETCD_URL=http://$ETCD_HOST:$ETCD_PORT
 fi
 
-
 echo ETCD_URL = $ETCD_URL
+
+JAVA_OPTS="-server"
+JAVA_OPTS="${JAVA_OPTS} -XX:MetaspaceSize=256m -XX:MaxMetaspaceSize=256m"
+JAVA_OPTS="${JAVA_OPTS} -XX:MaxDirectMemorySize=1g"
+JAVA_OPTS="${JAVA_OPTS} -XX:SurvivorRatio=10"
+JAVA_OPTS="${JAVA_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSMaxAbortablePrecleanTime=5000"
+JAVA_OPTS="${JAVA_OPTS} -XX:+CMSClassUnloadingEnabled -XX:CMSInitiatingOccupancyFraction=80 -XX:+UseCMSInitiatingOccupancyOnly"
+JAVA_OPTS="${JAVA_OPTS} -XX:+ExplicitGCInvokesConcurrent -Dsun.rmi.dgc.server.gcInterval=2592000000 -Dsun.rmi.dgc.client.gcInterval=2592000000"
+
 
 if [[ "$1" == "consumer" ]]; then
   echo "Starting consumer agent..."
   java -jar \
+       ${JAVA_OPTS} \
        -Xms1536M \
        -Xmx1536M \
        -Dtype=consumer \
@@ -22,8 +31,8 @@ if [[ "$1" == "consumer" ]]; then
 elif [[ "$1" == "provider-small" ]]; then
   echo "Starting small provider agent..."
   java -jar \
-       -Xms1024M \
-       -Xmx1024M \
+       -Xms512M \
+       -Xmx512M \
        -Dtype=provider \
        -Dserver.port=30000\
        -Ddubbo.protocol.port=20889 \
@@ -33,6 +42,7 @@ elif [[ "$1" == "provider-small" ]]; then
 elif [[ "$1" == "provider-medium" ]]; then
   echo "Starting medium provider agent..."
   java -jar \
+       ${JAVA_OPTS} \
        -Xms1536M \
        -Xmx1536M \
        -Dtype=provider \
@@ -44,6 +54,7 @@ elif [[ "$1" == "provider-medium" ]]; then
 elif [[ "$1" == "provider-large" ]]; then
   echo "Starting large provider agent..."
   java -jar \
+       ${JAVA_OPTS} \
        -Xms2560M \
        -Xmx2560M \
        -Dtype=provider \
