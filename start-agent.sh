@@ -22,12 +22,11 @@ if [[ "$1" == "consumer" ]]; then
 elif [[ "$1" == "provider-small" ]]; then
   echo "Starting small provider agent..."
   java -jar \
-       -Xms512M \
-       -Xmx512M \
+       -Xms1024M \
+       -Xmx1024M \
        -Dtype=provider \
        -Dserver.port=30000\
        -Ddubbo.protocol.port=20889 \
-       -Dserver.undertow.worker-threads=64 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
        /root/dists/mesh-agent.jar
@@ -39,7 +38,6 @@ elif [[ "$1" == "provider-medium" ]]; then
        -Dtype=provider \
        -Dserver.port=30001\
        -Ddubbo.protocol.port=20890 \
-       -Dserver.undertow.worker-threads=128 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
        /root/dists/mesh-agent.jar
@@ -51,7 +49,6 @@ elif [[ "$1" == "provider-large" ]]; then
        -Dtype=provider \
        -Dserver.port=30002\
        -Ddubbo.protocol.port=20891 \
-       -Dserver.undertow.worker-threads=256 \
        -Detcd.url=$ETCD_URL \
        -Dlogs.dir=/root/logs \
        /root/dists/mesh-agent.jar
