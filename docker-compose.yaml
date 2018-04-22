@@ -1,57 +1,39 @@
 version: '3.3'
 
-networks:
-  default:
-    driver: overlay
-    attachable: true
-
 services:
   etcd:
     image: quay.io/coreos/etcd
     command: etcd -name etcd0 -advertise-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001 -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
+    network_mode: "host"
 
   consumer:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
     command: consumer
-    environment:
-      ETCD_URL: http://etcd:2379
-    ports:
-      - "8087:8087"
-    links:
-      - etcd
+    network_mode: "host"
 
   provider-small:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
     command: provider-small
-    environment:
-        ETCD_URL: http://etcd:2379
     deploy:
       resources:
         limits:
           cpus: '0.60'
-    links:
-      - etcd
+    network_mode: "host"
 
   provider-medium:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
     command: provider-medium
-    environment:
-        ETCD_URL: http://etcd:2379
     deploy:
       resources:
         limits:
           cpus: '1.20'
-    links:
-      - etcd
+    network_mode: "host"
 
   provider-large:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
     command: provider-large
-    environment:
-        ETCD_URL: http://etcd:2379
     deploy:
       resources:
         limits:
           cpus: '1.80'
-    links:
-      - etcd
+    network_mode: "host"
