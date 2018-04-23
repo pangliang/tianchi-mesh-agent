@@ -19,12 +19,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class HelloController {
 
     private Logger logger = LoggerFactory.getLogger(HelloController.class);
-    
+
     private IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
 
     private List<Endpoint> endpoints = null;
     private Object lock = new Object();
     private AtomicInteger endPointIndex = new AtomicInteger(0);
+
+    private AtomicInteger activeClient = new AtomicInteger(0);
 
     @RequestMapping(value = "")
     public Object invoke(@RequestParam("interface") String interfaceName,
@@ -32,44 +34,52 @@ public class HelloController {
                          @RequestParam("parameterTypesString") String parameterTypesString,
                          @RequestParam("parameter") String parameter) throws Exception {
         String type = System.getProperty("type");   // 获取type参数
-        if ("consumer".equals(type)){
-            return consumer(interfaceName,method,parameterTypesString,parameter);
-        }else {
+        if ("consumer".equals(type)) {
+            return consumer(interfaceName, method, parameterTypesString, parameter);
+        } else {
             return "Environment variable type is needed to set to provider or consumer.";
         }
     }
 
-
-    public Integer consumer(String interfaceName,String method,String parameterTypesString,String parameter) throws Exception {
-        if (null == endpoints){
-            synchronized (lock){
-                if (null == endpoints){
+    public Integer consumer(String interfaceName, String method, String parameterTypesString, String parameter)
+        throws Exception {
+        if (null == endpoints) {
+            synchronized (lock) {
+                if (null == endpoints) {
                     endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
                     logger.info("endpoints: {}", endpoints);
-
-                    for(Endpoint e : endpoints){
-                        endpoints.set(e.getPort()%endpoints.size(), e);
-                    }
                 }
             }
         }
 
-        // 按1:2:3
-        int index = endPointIndex.addAndGet(1) % 6;
-        Endpoint endpoint = null;
-        switch (index){
-            case 1:
-                endpoint = endpoints.get(0);
-                break;
-            case 2:
-            case 4:
-                endpoint = endpoints.get(1);
-                break;
-            default:
-                endpoint = endpoints.get(2);
-                break;
+        //// 轮询
+        int index = endPointIndex.addAndGet(1);
+        Endpoint endpoint = endpoints.get(index % endpoints.size());
+
+        int clients = activeClient.addAndGet(1);
+
+        // qps 能力
+        double qps = 0;
+        for (Endpoint e : endpoints) {
+            qps += e.qps();
         }
-        Object result = endpoint.getRpcClient().invoke(interfaceName,method,parameterTypesString,parameter);
-        return Integer.valueOf(new String((byte[]) result));
+        for (Endpoint e : endpoints) {
+            //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+            if (e.getActive() < (clients * (e.qps() / qps))) {
+                endpoint = e;
+                break;
+            }
+        }
+
+        endpoint.start();
+        long start = System.nanoTime();
+
+        Object result = endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter);
+
+        long elapsed = System.nanoTime() - start;
+        endpoint.finish(elapsed);
+
+        activeClient.decrementAndGet();
+        return Integer.valueOf(new String((byte[])result));
     }
 }
