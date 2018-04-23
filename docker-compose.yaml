@@ -4,12 +4,20 @@ services:
   etcd:
     image: quay.io/coreos/etcd
     command: etcd -name etcd0 -advertise-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001 -listen-client-urls http://0.0.0.0:2379,http://0.0.0.0:4001
-    network_mode: "host"
+    ports:
+      - "2379:2379"
 
   consumer:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
     command: consumer
-    network_mode: "host"
+    environment:
+      ETCD_URL: http://172.19.0.1:2379
+    ports:
+      - "8087:8087"
+    depends_on:
+      - etcd
+    volumes:
+      - "/Volumes/d/pangliang-workspace/mesh-agent/mesh-agent/target/mesh-agent-1.0-SNAPSHOT.jar:/root/dists/mesh-agent.jar"
 
   provider-small:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
@@ -18,7 +26,14 @@ services:
       resources:
         limits:
           cpus: '0.60'
-    network_mode: "host"
+    environment:
+      ETCD_URL: http://172.19.0.1:2379
+    ports:
+      - "30000:30000"
+    depends_on:
+      - etcd
+    volumes:
+      - "/Volumes/d/pangliang-workspace/mesh-agent/mesh-agent/target/mesh-agent-1.0-SNAPSHOT.jar:/root/dists/mesh-agent.jar"
 
   provider-medium:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
@@ -27,7 +42,14 @@ services:
       resources:
         limits:
           cpus: '1.20'
-    network_mode: "host"
+    environment:
+      ETCD_URL: http://172.19.0.1:2379
+    ports:
+      - "30001:30001"
+    depends_on:
+      - etcd
+    volumes:
+      - "/Volumes/d/pangliang-workspace/mesh-agent/mesh-agent/target/mesh-agent-1.0-SNAPSHOT.jar:/root/dists/mesh-agent.jar"
 
   provider-large:
     image: registry.cn-qingdao.aliyuncs.com/pangliang/mesh-agent
@@ -36,4 +58,11 @@ services:
       resources:
         limits:
           cpus: '1.80'
-    network_mode: "host"
+    environment:
+      ETCD_URL: http://172.19.0.1:2379
+    ports:
+      - "30002:30002"
+    depends_on:
+      - etcd
+    volumes:
+      - "/Volumes/d/pangliang-workspace/mesh-agent/mesh-agent/target/mesh-agent-1.0-SNAPSHOT.jar:/root/dists/mesh-agent.jar"
