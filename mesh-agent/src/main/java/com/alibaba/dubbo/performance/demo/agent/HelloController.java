@@ -28,8 +28,6 @@ public class HelloController {
     private OkHttpClient httpClient = new OkHttpClient();
     private AtomicInteger endPointIndex = new AtomicInteger(0);
 
-    private AtomicInteger activeClient = new AtomicInteger(0);
-
     @RequestMapping(value = "")
     public Object invoke(@RequestParam("interface") String interfaceName,
                          @RequestParam("method") String method,
@@ -59,32 +57,29 @@ public class HelloController {
                 if (null == endpoints){
                     endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
                     logger.info("endpoints: {}", endpoints);
+
+                    for(Endpoint e : endpoints){
+                        endpoints.set(e.getPort()%endpoints.size(), e);
+                    }
                 }
             }
         }
 
-        //// 轮询
-        int index = endPointIndex.addAndGet(1);
-        Endpoint endpoint = endpoints.get(index % endpoints.size());
-
-        int clients = activeClient.addAndGet(1);
-
-        // qps 能力
-        double qps = 0;
-        for(Endpoint e: endpoints){
-            qps += e.qps();
-        }
-        for(Endpoint e: endpoints){
-            //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
-            if(e.getActive() < (clients * (e.qps()/qps))){
-                endpoint = e;
+        // 按1:2:3
+        int index = endPointIndex.addAndGet(1) % 6;
+        Endpoint endpoint = null;
+        switch (index){
+            case 1:
+                endpoint = endpoints.get(0);
                 break;
-            }
+            case 2:
+            case 4:
+                endpoint = endpoints.get(1);
+                break;
+            default:
+                endpoint = endpoints.get(2);
+                break;
         }
-
-        endpoint.start();
-        long start = System.nanoTime();
-
         String url =  "http://" + endpoint.getHost() + ":" + endpoint.getPort();
 
         RequestBody requestBody = new FormBody.Builder()
@@ -100,15 +95,10 @@ public class HelloController {
                 .build();
 
         try (Response response = httpClient.newCall(request).execute()) {
-            long elapsed = System.nanoTime() - start;
-            endpoint.finish(elapsed);
-
             if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
             byte[] bytes = response.body().bytes();
             String s = new String(bytes);
             return Integer.valueOf(s);
-        }finally {
-            activeClient.decrementAndGet();
         }
     }
 }
