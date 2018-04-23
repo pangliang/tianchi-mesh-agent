@@ -7,15 +7,18 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ConnecManager {
+    private Logger logger = LoggerFactory.getLogger(ConnecManager.class);
     private EventLoopGroup eventLoopGroup = new NioEventLoopGroup(4);
 
     private Bootstrap bootstrap;
 
-    private int channelSize = 4;
+    private int channelSize = 8;
     private Channel[] channels = null;
     private Object lock = new Object();
     private AtomicInteger count = new AtomicInteger(0);
@@ -32,7 +35,13 @@ public class ConnecManager {
         if (null == bootstrap) {
             synchronized (lock) {
                 if (null == bootstrap) {
-                    initBootstrap();
+                    bootstrap = new Bootstrap()
+                        .group(eventLoopGroup)
+                        .option(ChannelOption.SO_KEEPALIVE, true)
+                        .option(ChannelOption.TCP_NODELAY, true)
+                        .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
+                        .channel(NioSocketChannel.class)
+                        .handler(new RpcClientInitializer());
                 }
             }
         }
@@ -40,26 +49,16 @@ public class ConnecManager {
         if (null == channels) {
             synchronized (lock){
                 if (null == channels){
-                    Channel[] channels = new Channel[channelSize];
+                    logger.info("===============create channels===");
+                    Channel[] cs = new Channel[channelSize];
                     for(int i=0; i<channelSize; i++){
-                        channels[i] = bootstrap.connect(host, port).sync().channel();
+                        cs[i] = bootstrap.connect(host, port).sync().channel();
                     }
-                    this.channels = channels;
+                    this.channels = cs;
                 }
             }
         }
 
         return channels[index];
-    }
-
-    public void initBootstrap() {
-
-        bootstrap = new Bootstrap()
-                .group(eventLoopGroup)
-                .option(ChannelOption.SO_KEEPALIVE, true)
-                .option(ChannelOption.TCP_NODELAY, true)
-                .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
-                .channel(NioSocketChannel.class)
-                .handler(new RpcClientInitializer());
     }
 }

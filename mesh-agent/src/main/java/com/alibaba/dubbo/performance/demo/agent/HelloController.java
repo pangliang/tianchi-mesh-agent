@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -25,12 +26,14 @@ public class HelloController {
 
     private AtomicInteger activeClient = new AtomicInteger(0);
 
+    String type = System.getProperty("type");   // 获取type参数
+
     @RequestMapping(value = "")
     public Object invoke(@RequestParam("interface") String interfaceName,
                          @RequestParam("method") String method,
                          @RequestParam("parameterTypesString") String parameterTypesString,
                          @RequestParam("parameter") String parameter) throws Exception {
-        String type = System.getProperty("type");   // 获取type参数
+
         if ("consumer".equals(type)) {
             return consumer(interfaceName, method, parameterTypesString, parameter);
         } else {
@@ -53,30 +56,30 @@ public class HelloController {
         int index = endPointIndex.addAndGet(1);
         Endpoint endpoint = endpoints.get(index % endpoints.size());
 
-        int clients = activeClient.addAndGet(1);
-
-        // qps 能力
-        double qps = 0;
-        for (Endpoint e : endpoints) {
-            qps += e.qps();
-        }
-        for (Endpoint e : endpoints) {
-            //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
-            if (e.getActive() < (clients * (e.qps() / qps))) {
-                endpoint = e;
-                break;
-            }
-        }
-
-        endpoint.start();
-        long start = System.nanoTime();
+        //int clients = activeClient.addAndGet(1);
+        //
+        //// qps 能力
+        //double qps = 0;
+        //for (Endpoint e : endpoints) {
+        //    qps += e.qps();
+        //}
+        //for (Endpoint e : endpoints) {
+        //    //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+        //    if (e.getActive() < (clients * (e.qps() / qps))) {
+        //        endpoint = e;
+        //        break;
+        //    }
+        //}
+        //
+        //endpoint.start();
+        //long start = System.nanoTime();
 
         Object result = endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter);
 
-        long elapsed = System.nanoTime() - start;
-        endpoint.finish(elapsed);
+        //long elapsed = System.nanoTime() - start;
+        //endpoint.finish(elapsed);
+        //activeClient.decrementAndGet();
 
-        activeClient.decrementAndGet();
         return Integer.valueOf(new String((byte[])result));
     }
 }
