@@ -1,5 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -21,6 +23,8 @@ import java.net.Socket;
 @SpringBootApplication
 @ConditionalOnNotWebApplication
 public class ProviderProxy implements CommandLineRunner{
+    private Logger logger = LoggerFactory.getLogger(ProviderProxy.class);
+
     public static final int BUF_SIZE = 4096;
 
     @Value("${server.port}")
@@ -47,6 +51,7 @@ public class ProviderProxy implements CommandLineRunner{
                 while (true) {
                     Socket client = serverSocket.accept();
                     Socket dubbo = new Socket("127.0.0.1", dubboPort);
+                    logger.info("accept:{}", client);
                     new PumpThread(client.getInputStream(), dubbo.getOutputStream()).start();
                     new PumpThread(dubbo.getInputStream(), client.getOutputStream()).start();
                 }
