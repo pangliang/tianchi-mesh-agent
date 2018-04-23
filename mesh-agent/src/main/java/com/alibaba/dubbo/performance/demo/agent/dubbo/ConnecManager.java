@@ -19,7 +19,7 @@ public class ConnecManager {
     public ConnecManager() {
     }
 
-    public Channel getChannel() throws Exception {
+    public Channel getChannel(String host,int port) throws Exception {
         if (null != channel) {
             return channel;
         }
@@ -35,8 +35,7 @@ public class ConnecManager {
         if (null == channel) {
             synchronized (lock){
                 if (null == channel){
-                    int port = Integer.valueOf(System.getProperty("dubbo.protocol.port"));
-                    channel = bootstrap.connect("127.0.0.1", port).sync().channel();
+                    channel = bootstrap.connect(host, port).sync().channel();
                 }
             }
         }

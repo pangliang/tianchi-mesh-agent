@@ -17,17 +17,18 @@ import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 
 public class RpcClient {
-    private Logger logger = LoggerFactory.getLogger(RpcClient.class);
-
     private ConnecManager connectManager;
-
-    public RpcClient(IRegistry registry){
+    String host;
+    int port;
+    public RpcClient(String host,int port){
+        this.host = host;
+        this.port = port;
         this.connectManager = new ConnecManager();
     }
 
     public Object invoke(String interfaceName, String method, String parameterTypesString, String parameter) throws Exception {
 
-        Channel channel = connectManager.getChannel();
+        Channel channel = connectManager.getChannel(host, port);
 
         RpcInvocation invocation = new RpcInvocation();
         invocation.setMethodName(method);

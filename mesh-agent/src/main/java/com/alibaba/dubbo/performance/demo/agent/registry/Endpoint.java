@@ -1,12 +1,16 @@
 package com.alibaba.dubbo.performance.demo.agent.registry;
 
+import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClient;
+
 public class Endpoint {
     private final String host;
     private final int port;
+    private RpcClient rpcClient;
 
     public Endpoint(String host,int port){
         this.host = host;
         this.port = port;
+        this.rpcClient = new RpcClient(host, port);
     }
 
     public String getHost() {
@@ -31,5 +35,9 @@ public class Endpoint {
 
     public int hashCode(){
         return host.hashCode() + port;
+    }
+
+    public RpcClient getRpcClient() {
+        return rpcClient;
     }
 }

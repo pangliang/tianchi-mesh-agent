@@ -22,10 +22,8 @@ public class HelloController {
     
     private IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
 
-    private RpcClient rpcClient = new RpcClient(registry);
     private List<Endpoint> endpoints = null;
     private Object lock = new Object();
-    private OkHttpClient httpClient = new OkHttpClient();
     private AtomicInteger endPointIndex = new AtomicInteger(0);
 
     @RequestMapping(value = "")
@@ -36,22 +34,13 @@ public class HelloController {
         String type = System.getProperty("type");   // 获取type参数
         if ("consumer".equals(type)){
             return consumer(interfaceName,method,parameterTypesString,parameter);
-        }
-        else if ("provider".equals(type)){
-            return provider(interfaceName,method,parameterTypesString,parameter);
         }else {
             return "Environment variable type is needed to set to provider or consumer.";
         }
     }
 
-    public byte[] provider(String interfaceName,String method,String parameterTypesString,String parameter) throws Exception {
-
-        Object result = rpcClient.invoke(interfaceName,method,parameterTypesString,parameter);
-        return (byte[]) result;
-    }
 
     public Integer consumer(String interfaceName,String method,String parameterTypesString,String parameter) throws Exception {
-        //logger.info("consumer:{}, {}, {}, {}", interfaceName, method, parameterTypesString, parameter);
         if (null == endpoints){
             synchronized (lock){
                 if (null == endpoints){
@@ -80,25 +69,7 @@ public class HelloController {
                 endpoint = endpoints.get(2);
                 break;
         }
-        String url =  "http://" + endpoint.getHost() + ":" + endpoint.getPort();
-
-        RequestBody requestBody = new FormBody.Builder()
-                .add("interface",interfaceName)
-                .add("method",method)
-                .add("parameterTypesString",parameterTypesString)
-                .add("parameter",parameter)
-                .build();
-
-        Request request = new Request.Builder()
-                .url(url)
-                .post(requestBody)
-                .build();
-
-        try (Response response = httpClient.newCall(request).execute()) {
-            if (!response.isSuccessful()) throw new IOException("Unexpected code " + response);
-            byte[] bytes = response.body().bytes();
-            String s = new String(bytes);
-            return Integer.valueOf(s);
-        }
+        Object result = endpoint.getRpcClient().invoke(interfaceName,method,parameterTypesString,parameter);
+        return Integer.valueOf(new String((byte[]) result));
     }
 }
