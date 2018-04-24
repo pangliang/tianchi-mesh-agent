@@ -1,6 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent.proxy;
 
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
@@ -38,7 +39,10 @@ public class HexDumpProxyFrontendHandler extends ChannelInboundHandlerAdapter {
         b.group(inboundChannel.eventLoop())
             .channel(ctx.channel().getClass())
             .handler(new HexDumpProxyBackendHandler(inboundChannel))
-            .option(ChannelOption.AUTO_READ, false);
+            .option(ChannelOption.AUTO_READ, false)
+            .option(ChannelOption.SO_KEEPALIVE, true)
+            .option(ChannelOption.TCP_NODELAY, true)
+            .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
         ChannelFuture f = b.connect(remoteHost, remotePort);
         outboundChannel = f.channel();
         f.addListener(new ChannelFutureListener() {

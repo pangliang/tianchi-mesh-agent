@@ -2,11 +2,14 @@ package com.alibaba.dubbo.performance.demo.agent.proxy;
 
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
+import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
+import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -32,27 +35,21 @@ public class HexDumpProxy implements CommandLineRunner {
 
         registry.register("com.alibaba.dubbo.performance.demo.provider.IHelloService", localPort);
 
-        EventLoopGroup bossGroup = new NioEventLoopGroup(4);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        ServerBootstrap b = NettyUtils.createServerBootstrap(4, 16);
         try {
-            ServerBootstrap b = new ServerBootstrap();
-            b.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childOption(ChannelOption.TCP_NODELAY, true)
-                .childOption(ChannelOption.AUTO_READ, false)
-                .childHandler(new ChannelInitializer<SocketChannel> (){
-                    @Override
-                    protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(
-                            new HexDumpProxyFrontendHandler(remoteHost, remotePort)
-                        );
-                    }
-                })
-                .bind(localPort).sync().channel().closeFuture().sync();
+
+            b.childOption(ChannelOption.AUTO_READ, false)
+            .childHandler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(
+                        new HexDumpProxyFrontendHandler(remoteHost, remotePort)
+                    );
+                }
+            }).bind(localPort).sync().channel().closeFuture().sync();
         } finally {
-            bossGroup.shutdownGracefully();
-            workerGroup.shutdownGracefully();
+            b.config().group().shutdownGracefully();
+            b.config().childGroup().shutdownGracefully();
         }
     }
 }

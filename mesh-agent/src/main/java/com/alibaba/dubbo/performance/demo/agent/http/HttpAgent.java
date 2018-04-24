@@ -5,10 +5,14 @@ import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcResponse;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
+import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.PooledByteBufAllocator;
+import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
+import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -46,30 +50,22 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-
-        EventLoopGroup bossGroup = new NioEventLoopGroup(4);
-        EventLoopGroup workerGroup = new NioEventLoopGroup(256);
+        ServerBootstrap b = NettyUtils.createServerBootstrap(4, 16);
         try {
-            ServerBootstrap b = new ServerBootstrap();
-            b.group(bossGroup, workerGroup)
-                .channel(NioServerSocketChannel.class)
-                .childOption(ChannelOption.SO_KEEPALIVE, true)
-                .childOption(ChannelOption.TCP_NODELAY, true)
-                .childHandler(new ChannelInitializer<SocketChannel>() {
-                    @Override
-                    protected void initChannel(SocketChannel ch) throws Exception {
-                        ch.pipeline().addLast(
-                            new HttpRequestDecoder(),
-                            new HttpObjectAggregator(4096),
-                            new HttpResponseEncoder(),
-                            new HttpHandler()
-                        );
-                    }
-                })
-                .bind(localPort).sync().channel().closeFuture().sync();
+            b.childHandler(new ChannelInitializer<SocketChannel>() {
+                @Override
+                protected void initChannel(SocketChannel ch) throws Exception {
+                    ch.pipeline().addLast(
+                        new HttpRequestDecoder(),
+                        new HttpObjectAggregator(4096),
+                        new HttpResponseEncoder(),
+                        new HttpHandler()
+                    );
+                }
+            }).bind(localPort).sync().channel().closeFuture().sync();
         } finally {
-            bossGroup.shutdownGracefully();
-            workerGroup.shutdownGracefully();
+            b.config().group().shutdownGracefully();
+            b.config().childGroup().shutdownGracefully();
         }
     }
 
@@ -93,7 +89,7 @@ public class HttpAgent implements CommandLineRunner {
             String body = msg.content().toString(Charset.defaultCharset());
 
             int pos = body.indexOf(paramName);
-            if(pos < 0){
+            if (pos < 0) {
                 return;
             }
 
@@ -111,7 +107,8 @@ public class HttpAgent implements CommandLineRunner {
                 qps += e.qps();
             }
             for (Endpoint e : endpoints) {
-                //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+                //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e
+                // .getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
                 if (e.getActive() < (clients * (e.qps() / qps))) {
                     endpoint = e;
                     break;
@@ -140,7 +137,7 @@ public class HttpAgent implements CommandLineRunner {
                 }
             };
 
-            endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter,callback);
+            endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter, callback);
 
         }
 
