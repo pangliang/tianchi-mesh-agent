@@ -50,7 +50,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap b = NettyUtils.createServerBootstrap(16);
+        ServerBootstrap b = NettyUtils.createServerBootstrap(32);
         try {
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
@@ -99,32 +99,32 @@ public class HttpAgent implements CommandLineRunner {
             int index = endPointIndex.addAndGet(1);
             Endpoint endpoint = endpoints.get(index % endpoints.size());
 
-            int clients = activeClient.addAndGet(1);
+            //int clients = activeClient.addAndGet(1);
+            //
+            //// qps 能力
+            //double qps = 0;
+            //for (Endpoint e : endpoints) {
+            //    qps += e.qps();
+            //}
+            //for (Endpoint e : endpoints) {
+            //    //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e
+            //    // .getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+            //    if (e.getActive() < (clients * (e.qps() / qps))) {
+            //        endpoint = e;
+            //        break;
+            //    }
+            //}
 
-            // qps 能力
-            double qps = 0;
-            for (Endpoint e : endpoints) {
-                qps += e.qps();
-            }
-            for (Endpoint e : endpoints) {
-                //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e
-                // .getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
-                if (e.getActive() < (clients * (e.qps() / qps))) {
-                    endpoint = e;
-                    break;
-                }
-            }
-
-            endpoint.start();
-            long start = System.nanoTime();
-
+            //endpoint.start();
+            //long start = System.nanoTime();
             Endpoint finalEndpoint = endpoint;
+
             RpcCallback callback = new RpcCallback() {
                 @Override
                 public void handler(RpcResponse response) {
-                    long elapsed = System.nanoTime() - start;
-                    finalEndpoint.finish(elapsed);
-                    activeClient.decrementAndGet();
+                    //long elapsed = System.nanoTime() - start;
+                    //finalEndpoint.finish(elapsed);
+                    //activeClient.decrementAndGet();
 
                     byte[] result = response.getBytes();
                     FullHttpResponse httpResponse = new DefaultFullHttpResponse(
