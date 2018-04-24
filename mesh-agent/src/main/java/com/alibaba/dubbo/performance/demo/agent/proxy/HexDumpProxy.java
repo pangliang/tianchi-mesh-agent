@@ -38,13 +38,9 @@ public class HexDumpProxy implements CommandLineRunner {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
-                .option(ChannelOption.SO_BACKLOG, 1024)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
                 .childOption(ChannelOption.AUTO_READ, false)
-                .childOption(ChannelOption.SO_SNDBUF, 4096)
-                .childOption(ChannelOption.SO_RCVBUF, 4096)
-                .childOption(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
                 .childHandler(new ChannelInitializer<SocketChannel> (){
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
