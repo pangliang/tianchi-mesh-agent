@@ -48,7 +48,7 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(4);
-        EventLoopGroup workerGroup = new NioEventLoopGroup();
+        EventLoopGroup workerGroup = new NioEventLoopGroup(256);
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
