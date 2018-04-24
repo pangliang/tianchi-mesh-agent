@@ -32,6 +32,9 @@ if [[ "$1" == "consumer" ]]; then
 elif [[ "$1" == "provider-small" ]]; then
   echo "Starting small provider agent..."
   java -jar \
+       -server \
+       -XX:SurvivorRatio=10 \
+       -Dio.netty.leakDetectionLevel=DISABLED \
        -Xms512M \
        -Xmx512M \
        -Dtype=provider \
