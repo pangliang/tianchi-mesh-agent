@@ -76,8 +76,8 @@ public class DubboRpcDecoder extends ByteToMessageDecoder {
 
         byte[] header = new byte[HEADER_LENGTH];
         byteBuf.readBytes(header);
-        byte[] dataLen = Arrays.copyOfRange(header,12,16);
-        int len = Bytes.bytes2int(dataLen);
+
+        int len = Bytes.bytes2int(header, 12);
         int tt = len + HEADER_LENGTH;
         if (readable < tt) {
             return DecodeResult.NEED_MORE_INPUT;
@@ -96,11 +96,7 @@ public class DubboRpcDecoder extends ByteToMessageDecoder {
         // dubbo返回的body中，前后各有一个换行，去掉
         byte[] subArray = Arrays.copyOfRange(data,HEADER_LENGTH + 2, data.length -1 );
 
-        String s = new String(subArray);
-        //System.err.println(s);
-
-        byte[] requestIdBytes = Arrays.copyOfRange(data,4,12);
-        long requestId = Bytes.bytes2long(requestIdBytes,0);
+        long requestId = Bytes.bytes2long(data,4);
 
         RpcResponse response = new RpcResponse();
         response.setRequestId(String.valueOf(requestId));
