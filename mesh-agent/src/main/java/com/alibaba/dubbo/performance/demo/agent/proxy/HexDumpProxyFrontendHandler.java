@@ -1,57 +1,43 @@
 package com.alibaba.dubbo.performance.demo.agent.proxy;
 
-import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
-import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
-import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
-import io.netty.channel.socket.nio.NioSocketChannel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import io.netty.channel.ChannelOption;
 
 /**
  * @author wei.liang
  * @date 2018/4/24
  */
 public class HexDumpProxyFrontendHandler extends ChannelInboundHandlerAdapter {
-    private Logger logger = LoggerFactory.getLogger(HexDumpProxyFrontendHandler.class);
 
-    private static IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
-    private static Object lock = new Object();
-    private static AtomicInteger endPointIndex = new AtomicInteger(0);
-    private static List<Endpoint> endpoints = null;
+    private final String remoteHost;
+    private final int remotePort;
 
-    Channel outboundChannel = null;
+    // As we use inboundChannel.eventLoop() when building the Bootstrap this does not need to be volatile as
+    // the outboundChannel will use the same EventLoop (and therefore Thread) as the inboundChannel.
+    private Channel outboundChannel;
+
+    public HexDumpProxyFrontendHandler(String remoteHost, int remotePort) {
+        this.remoteHost = remoteHost;
+        this.remotePort = remotePort;
+    }
 
     @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        if (null == endpoints) {
-            synchronized (lock) {
-                if (null == endpoints) {
-                    List<Endpoint> endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
-                    logger.info("endpoints: {}", endpoints);
-                    HexDumpProxyFrontendHandler.endpoints = endpoints;
-                }
-            }
-        }
-
-        int index = endPointIndex.addAndGet(1);
-        Endpoint endpoint = endpoints.get(index % endpoints.size());
-
+    public void channelActive(ChannelHandlerContext ctx) {
         final Channel inboundChannel = ctx.channel();
+
+        // Start the connection attempt.
         Bootstrap b = new Bootstrap();
         b.group(inboundChannel.eventLoop())
-            .channel(NioSocketChannel.class)
+            .channel(ctx.channel().getClass())
             .handler(new HexDumpProxyBackendHandler(inboundChannel))
-            .option(ChannelOption.SO_KEEPALIVE, true)
-            .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.AUTO_READ, false);
-
-        ChannelFuture f = b.connect(endpoint.getHost(), endpoint.getPort());
+        ChannelFuture f = b.connect(remoteHost, remotePort);
         outboundChannel = f.channel();
         f.addListener(new ChannelFutureListener() {
             @Override

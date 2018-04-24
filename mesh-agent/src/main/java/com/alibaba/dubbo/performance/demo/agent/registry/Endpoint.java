@@ -2,7 +2,6 @@ package com.alibaba.dubbo.performance.demo.agent.registry;
 
 import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClient;
 import com.google.common.util.concurrent.AtomicDouble;
-import io.netty.channel.Channel;
 
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -11,6 +10,7 @@ import java.util.concurrent.atomic.AtomicLong;
 public class Endpoint {
     private final String host;
     private final int port;
+    private RpcClient rpcClient;
     private AtomicLong times = new AtomicLong(0);
     private AtomicDouble elapsed = new AtomicDouble(0);
     private AtomicInteger active = new AtomicInteger(0);
@@ -18,6 +18,7 @@ public class Endpoint {
     public Endpoint(String host,int port){
         this.host = host;
         this.port = port;
+        this.rpcClient = new RpcClient(host, port);
     }
 
     public String getHost() {
@@ -42,6 +43,10 @@ public class Endpoint {
 
     public int hashCode(){
         return host.hashCode() + port;
+    }
+
+    public RpcClient getRpcClient() {
+        return rpcClient;
     }
 
     public void start(){

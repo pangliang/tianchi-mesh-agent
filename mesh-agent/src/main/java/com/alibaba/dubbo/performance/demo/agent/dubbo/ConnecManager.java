@@ -16,9 +16,11 @@ public class ConnecManager {
     private Logger logger = LoggerFactory.getLogger(ConnecManager.class);
     private EventLoopGroup eventLoopGroup = new NioEventLoopGroup(4);
 
-    private int channelSize = 1;
+    private Bootstrap bootstrap;
+
+    private int channelSize = 4;
     private Channel[] channels = null;
-    private final Object lock = new Object();
+    private Object lock = new Object();
     private AtomicInteger count = new AtomicInteger(0);
 
     public ConnecManager() {
@@ -30,21 +32,30 @@ public class ConnecManager {
             return channels[index];
         }
 
-        synchronized (lock){
-            if (null == channels){
-                logger.info("===============create channels===");
-                Bootstrap bootstrap = new Bootstrap()
-                    .group(eventLoopGroup)
-                    .option(ChannelOption.SO_KEEPALIVE, true)
-                    .option(ChannelOption.TCP_NODELAY, true)
-                    .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
-                    .channel(NioSocketChannel.class)
-                    .handler(new RpcClientInitializer());
-                Channel[] cs = new Channel[channelSize];
-                for(int i=0; i<channelSize; i++){
-                    cs[i] = bootstrap.connect(host, port).sync().channel();
+        if (null == bootstrap) {
+            synchronized (lock) {
+                if (null == bootstrap) {
+                    bootstrap = new Bootstrap()
+                        .group(eventLoopGroup)
+                        .option(ChannelOption.SO_KEEPALIVE, true)
+                        .option(ChannelOption.TCP_NODELAY, true)
+                        .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
+                        .channel(NioSocketChannel.class)
+                        .handler(new RpcClientInitializer());
                 }
-                this.channels = cs;
+            }
+        }
+
+        if (null == channels) {
+            synchronized (lock){
+                if (null == channels){
+                    logger.info("===============create channels===");
+                    Channel[] cs = new Channel[channelSize];
+                    for(int i=0; i<channelSize; i++){
+                        cs[i] = bootstrap.connect(host, port).sync().channel();
+                    }
+                    this.channels = cs;
+                }
             }
         }
 

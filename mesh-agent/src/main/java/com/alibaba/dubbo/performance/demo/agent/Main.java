@@ -11,12 +11,12 @@ public class Main {
     public static void main(String[] args) {
         String type = System.getProperty("type");   // 获取type参数
         if ("consumer".equals(type)){
+            SpringApplication.run(AgentApp.class,args);
+        }else {
             System.out.println("==================no web =======");
             SpringApplication app = new SpringApplication(HexDumpProxy.class);
             app.setWebEnvironment(false);
             app.run(args);
-        }else {
-            SpringApplication.run(AgentApp.class,args);
         }
 
     }
