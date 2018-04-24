@@ -2,13 +2,15 @@ package com.alibaba.dubbo.performance.demo.agent.proxy;
 
 
 import io.netty.channel.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author wei.liang
  * @date 2018/4/24
  */
 public class HexDumpProxyBackendHandler extends ChannelInboundHandlerAdapter {
-
+    private Logger logger = LoggerFactory.getLogger(HexDumpProxyBackendHandler.class);
     private final Channel inboundChannel;
 
     public HexDumpProxyBackendHandler(Channel inboundChannel) {
@@ -41,7 +43,7 @@ public class HexDumpProxyBackendHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        logger.error("", cause);
         HexDumpProxyFrontendHandler.closeOnFlush(ctx.channel());
     }
 }

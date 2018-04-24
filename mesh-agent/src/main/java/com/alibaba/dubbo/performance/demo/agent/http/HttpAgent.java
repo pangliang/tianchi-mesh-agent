@@ -7,6 +7,7 @@ import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
@@ -14,7 +15,6 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
@@ -30,8 +30,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SpringBootApplication
 @ConditionalOnNotWebApplication
 public class HttpAgent implements CommandLineRunner {
-    @Value("${server.port}")
-    int LOCAL_PORT;
+    private Logger logger = LoggerFactory.getLogger(HttpAgent.class);
+
+    private int localPort = Integer.valueOf(System.getProperty("server.port"));
 
     private static String interfaceName = "com.alibaba.dubbo.performance.demo.provider.IHelloService";
     private static String method = "hash";
@@ -47,19 +48,19 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
 
         EventLoopGroup bossGroup = new NioEventLoopGroup(4);
-        EventLoopGroup workerGroup = new NioEventLoopGroup(512);
+        EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
             b.group(bossGroup, workerGroup)
                 .channel(NioServerSocketChannel.class)
+                .option(ChannelOption.SO_BACKLOG, 1024)
                 .childOption(ChannelOption.SO_KEEPALIVE, true)
                 .childOption(ChannelOption.TCP_NODELAY, true)
-                //.handler(new LoggingHandler(LogLevel.INFO))
+                .childOption(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
                 .childHandler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) throws Exception {
                         ch.pipeline().addLast(
-                            //new LoggingHandler(LogLevel.INFO),
                             new HttpRequestDecoder(),
                             new HttpObjectAggregator(4096),
                             new HttpResponseEncoder(),
@@ -67,7 +68,7 @@ public class HttpAgent implements CommandLineRunner {
                         );
                     }
                 })
-                .bind(LOCAL_PORT).sync().channel().closeFuture().sync();
+                .bind(localPort).sync().channel().closeFuture().sync();
         } finally {
             bossGroup.shutdownGracefully();
             workerGroup.shutdownGracefully();
@@ -134,8 +135,10 @@ public class HttpAgent implements CommandLineRunner {
                     FullHttpResponse httpResponse = new DefaultFullHttpResponse(
                         HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
                         Unpooled.wrappedBuffer(result));
-                    httpResponse.headers().add(HttpHeaderNames.CONTENT_LENGTH, result.length);
 
+                    httpResponse.headers().add("Connection", "keep-alive");
+                    httpResponse.headers().add("Content-Length", result.length);
+                    httpResponse.headers().add("Content-Type", "text/plain;charset=UTF-8");
 
                     ctx.channel().writeAndFlush(httpResponse);
                 }
@@ -147,11 +150,9 @@ public class HttpAgent implements CommandLineRunner {
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-            cause.printStackTrace();
-
+            logger.error("error", cause);
             FullHttpResponse response = new DefaultFullHttpResponse(
                 HttpVersion.HTTP_1_1, HttpResponseStatus.INTERNAL_SERVER_ERROR);
-
             ctx.channel().writeAndFlush(response).addListener(ChannelFutureListener.CLOSE);
         }
     }

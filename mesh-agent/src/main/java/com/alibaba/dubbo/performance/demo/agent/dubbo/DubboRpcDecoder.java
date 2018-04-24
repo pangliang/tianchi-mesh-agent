@@ -36,6 +36,7 @@ public class DubboRpcDecoder extends ByteToMessageDecoder {
                 }
 
                 list.add(msg);
+
             } while (byteBuf.isReadable());
         } finally {
             if (byteBuf.isReadable()) {
@@ -45,6 +46,11 @@ public class DubboRpcDecoder extends ByteToMessageDecoder {
 
 
         //list.add(decode2(byteBuf));
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
     }
 
     enum DecodeResult {

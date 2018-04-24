@@ -8,13 +8,15 @@ import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * @author wei.liang
  * @date 2018/4/24
  */
 public class HexDumpProxyFrontendHandler extends ChannelInboundHandlerAdapter {
-
+    private Logger logger = LoggerFactory.getLogger(HexDumpProxyFrontendHandler.class);
     private final String remoteHost;
     private final int remotePort;
 
@@ -79,7 +81,7 @@ public class HexDumpProxyFrontendHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
-        cause.printStackTrace();
+        logger.error("error", cause);
         closeOnFlush(ctx.channel());
     }
 

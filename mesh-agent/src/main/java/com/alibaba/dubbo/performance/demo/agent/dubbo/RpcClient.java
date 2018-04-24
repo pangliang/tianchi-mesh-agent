@@ -1,25 +1,35 @@
 package com.alibaba.dubbo.performance.demo.agent.dubbo;
 
 import com.alibaba.dubbo.performance.demo.agent.dubbo.model.*;
-import io.netty.channel.Channel;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.UnpooledByteBufAllocator;
+import io.netty.channel.*;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
+import io.netty.channel.socket.nio.NioSocketChannel;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class RpcClient {
-    private ConnecManager connectManager;
-    String host;
-    int port;
+    private EventLoopGroup eventLoopGroup = new NioEventLoopGroup(4);
+    private String host;
+    private int port;
+    private Object lock = new Object();
+    private int channelSize = 4;
+    private Channel[] channels;
+    private AtomicInteger count = new AtomicInteger(0);
+
     public RpcClient(String host,int port){
         this.host = host;
         this.port = port;
-        this.connectManager = new ConnecManager();
     }
 
     public void invoke(String interfaceName, String method, String parameterTypesString, String parameter, RpcCallback callback) throws Exception {
 
-        Channel channel = connectManager.getChannel(host, port);
+        Channel channel = getChannel();
 
         RpcInvocation invocation = new RpcInvocation();
         invocation.setMethodName(method);
@@ -41,5 +51,37 @@ public class RpcClient {
         RpcRequestHolder.put(String.valueOf(request.getId()),callback);
 
         channel.writeAndFlush(request);
+    }
+
+    private Channel getChannel() throws InterruptedException {
+        if (null == channels) {
+            synchronized (lock) {
+                if (null == channels) {
+                    Bootstrap bootstrap = new Bootstrap()
+                        .group(eventLoopGroup)
+                        .channel(NioSocketChannel.class)
+                        .option(ChannelOption.SO_KEEPALIVE, true)
+                        .option(ChannelOption.TCP_NODELAY, true)
+                        .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
+                        .handler(new ChannelInitializer<SocketChannel>() {
+                            @Override
+                            protected void initChannel(SocketChannel socketChannel) {
+                                ChannelPipeline pipeline = socketChannel.pipeline();
+                                pipeline.addLast(new DubboRpcEncoder());
+                                pipeline.addLast(new DubboRpcDecoder());
+                                pipeline.addLast(new RpcClientHandler());
+                            }
+                        });
+                    Channel[] cs = new Channel[channelSize];
+                    for(int i=0;i<channelSize;i++){
+                        cs[i] = bootstrap.connect(host, port).sync().channel();
+                    }
+                    this.channels = cs;
+                }
+            }
+        }
+
+        int index = count.getAndAdd(1) % channelSize;
+        return channels[index];
     }
 }

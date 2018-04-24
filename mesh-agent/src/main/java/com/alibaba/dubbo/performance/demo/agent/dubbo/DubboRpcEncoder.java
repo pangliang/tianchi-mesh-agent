@@ -73,4 +73,8 @@ public class DubboRpcEncoder extends MessageToByteEncoder{
         JsonUtils.writeObject(inv.getAttachments(), writer);
     }
 
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
+        cause.printStackTrace();
+    }
 }
