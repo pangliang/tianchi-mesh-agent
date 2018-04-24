@@ -2,10 +2,9 @@ package com.alibaba.dubbo.performance.demo.agent.dubbo;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.buffer.UnpooledByteBufAllocator;
-import io.netty.channel.Channel;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.EventLoopGroup;
+import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,7 +25,7 @@ public class ConnecManager {
     public ConnecManager() {
     }
 
-    public Channel getChannel(String host,int port) throws Exception {
+    public Channel getChannel(String host, int port) throws Exception {
         int index = count.getAndAdd(1) % channelSize;
         if (null != channels) {
             return channels[index];
@@ -41,17 +40,25 @@ public class ConnecManager {
                         .option(ChannelOption.TCP_NODELAY, true)
                         .option(ChannelOption.ALLOCATOR, UnpooledByteBufAllocator.DEFAULT)
                         .channel(NioSocketChannel.class)
-                        .handler(new RpcClientInitializer());
+                        .handler(new ChannelInitializer<SocketChannel>() {
+                            @Override
+                            protected void initChannel(SocketChannel socketChannel) {
+                                ChannelPipeline pipeline = socketChannel.pipeline();
+                                pipeline.addLast(new DubboRpcEncoder());
+                                pipeline.addLast(new DubboRpcDecoder());
+                                pipeline.addLast(new RpcClientHandler());
+                            }
+                        });
                 }
             }
         }
 
         if (null == channels) {
-            synchronized (lock){
-                if (null == channels){
+            synchronized (lock) {
+                if (null == channels) {
                     logger.info("===============create channels===");
                     Channel[] cs = new Channel[channelSize];
-                    for(int i=0; i<channelSize; i++){
+                    for (int i = 0; i < channelSize; i++) {
                         cs[i] = bootstrap.connect(host, port).sync().channel();
                     }
                     this.channels = cs;

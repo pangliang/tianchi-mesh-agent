@@ -1,5 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent.http;
 
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcCallback;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcResponse;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
@@ -120,19 +122,27 @@ public class HttpAgent implements CommandLineRunner {
             endpoint.start();
             long start = System.nanoTime();
 
-            byte[] result = (byte[])endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter);
+            Endpoint finalEndpoint = endpoint;
+            RpcCallback callback = new RpcCallback() {
+                @Override
+                public void handler(RpcResponse response) {
+                    long elapsed = System.nanoTime() - start;
+                    finalEndpoint.finish(elapsed);
+                    activeClient.decrementAndGet();
 
-            long elapsed = System.nanoTime() - start;
-            endpoint.finish(elapsed);
-            activeClient.decrementAndGet();
-
-            FullHttpResponse response = new DefaultFullHttpResponse(
-                HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
-                Unpooled.wrappedBuffer(result));
-            response.headers().add(HttpHeaderNames.CONTENT_LENGTH, result.length);
+                    byte[] result = response.getBytes();
+                    FullHttpResponse httpResponse = new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
+                        Unpooled.wrappedBuffer(result));
+                    httpResponse.headers().add(HttpHeaderNames.CONTENT_LENGTH, result.length);
 
 
-            ctx.channel().writeAndFlush(response);
+                    ctx.channel().writeAndFlush(httpResponse);
+                }
+            };
+
+            endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter,callback);
+
         }
 
         @Override

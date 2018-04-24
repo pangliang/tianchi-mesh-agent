@@ -1,16 +1,7 @@
 package com.alibaba.dubbo.performance.demo.agent.dubbo;
 
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.JsonUtils;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Request;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcFuture;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcInvocation;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcRequestHolder;
-
-import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.*;
 import io.netty.channel.Channel;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.OutputStreamWriter;
@@ -26,7 +17,7 @@ public class RpcClient {
         this.connectManager = new ConnecManager();
     }
 
-    public Object invoke(String interfaceName, String method, String parameterTypesString, String parameter) throws Exception {
+    public void invoke(String interfaceName, String method, String parameterTypesString, String parameter, RpcCallback callback) throws Exception {
 
         Channel channel = connectManager.getChannel(host, port);
 
@@ -47,17 +38,8 @@ public class RpcClient {
 
         //logger.info("requestId=" + request.getId());
 
-        RpcFuture future = new RpcFuture();
-        RpcRequestHolder.put(String.valueOf(request.getId()),future);
+        RpcRequestHolder.put(String.valueOf(request.getId()),callback);
 
         channel.writeAndFlush(request);
-
-        Object result = null;
-        try {
-            result = future.get();
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-        return result;
     }
 }
