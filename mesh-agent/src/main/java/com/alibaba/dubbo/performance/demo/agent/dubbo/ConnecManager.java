@@ -18,7 +18,7 @@ public class ConnecManager {
 
     private Bootstrap bootstrap;
 
-    private int channelSize = 8;
+    private int channelSize = 4;
     private Channel[] channels = null;
     private Object lock = new Object();
     private AtomicInteger count = new AtomicInteger(0);

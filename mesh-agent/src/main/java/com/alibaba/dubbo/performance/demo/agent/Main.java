@@ -1,5 +1,6 @@
 package com.alibaba.dubbo.performance.demo.agent;
 
+import com.alibaba.dubbo.performance.demo.agent.proxy.HexDumpProxy;
 import org.springframework.boot.SpringApplication;
 
 /**
@@ -13,7 +14,7 @@ public class Main {
             SpringApplication.run(AgentApp.class,args);
         }else {
             System.out.println("==================no web =======");
-            SpringApplication app = new SpringApplication(ProviderProxy.class);
+            SpringApplication app = new SpringApplication(HexDumpProxy.class);
             app.setWebEnvironment(false);
             app.run(args);
         }
