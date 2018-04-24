@@ -23,8 +23,8 @@ public class NettyUtils {
         return IS_LINUX ? new EpollEventLoopGroup(nThreads) : new NioEventLoopGroup(nThreads);
     }
 
-    public static ServerBootstrap createServerBootstrap(int bossThreads, int workerThreads){
-        EventLoopGroup bossGroup = NettyUtils.createEventLoopGroup(bossThreads);
+    public static ServerBootstrap createServerBootstrap(int workerThreads){
+        EventLoopGroup bossGroup = NettyUtils.createEventLoopGroup(1);
         EventLoopGroup workerGroup = NettyUtils.createEventLoopGroup(workerThreads);
         return new ServerBootstrap()
             .group(bossGroup, workerGroup)

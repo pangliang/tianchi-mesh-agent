@@ -50,7 +50,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap b = NettyUtils.createServerBootstrap(4, 16);
+        ServerBootstrap b = NettyUtils.createServerBootstrap(16);
         try {
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override

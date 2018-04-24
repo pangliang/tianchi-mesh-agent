@@ -35,7 +35,7 @@ public class HexDumpProxy implements CommandLineRunner {
 
         registry.register("com.alibaba.dubbo.performance.demo.provider.IHelloService", localPort);
 
-        ServerBootstrap b = NettyUtils.createServerBootstrap(4, 16);
+        ServerBootstrap b = NettyUtils.createServerBootstrap(16);
         try {
 
             b.childOption(ChannelOption.AUTO_READ, false)
