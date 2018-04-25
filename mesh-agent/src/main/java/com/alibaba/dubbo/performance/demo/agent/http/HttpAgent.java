@@ -7,15 +7,9 @@ import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
 import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.PooledByteBufAllocator;
-import io.netty.buffer.PooledByteBufAllocatorMetric;
 import io.netty.buffer.Unpooled;
-import io.netty.buffer.UnpooledByteBufAllocator;
 import io.netty.channel.*;
-import io.netty.channel.epoll.EpollEventLoopGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
-import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -45,7 +39,7 @@ public class HttpAgent implements CommandLineRunner {
     private static IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
     private static List<Endpoint> endpoints = null;
     private static Object lock = new Object();
-    private static AtomicInteger endPointIndex = new AtomicInteger(0);
+    private static AtomicInteger counter = new AtomicInteger(0);
     private static AtomicInteger activeClient = new AtomicInteger(0);
 
     @Override
@@ -96,35 +90,36 @@ public class HttpAgent implements CommandLineRunner {
             String parameter = body.substring(pos + paramLen);
 
             // 轮询
-            int index = endPointIndex.addAndGet(1);
-            Endpoint endpoint = endpoints.get(index % endpoints.size());
+            int count = counter.addAndGet(1);
+            Endpoint endpoint = endpoints.get(count % endpoints.size());
 
-            //int clients = activeClient.addAndGet(1);
-            //
-            //// qps 能力
-            //double qps = 0;
-            //for (Endpoint e : endpoints) {
-            //    qps += e.qps();
-            //}
-            //for (Endpoint e : endpoints) {
-            //    //logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e
-            //    // .getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
-            //    if (e.getActive() < (clients * (e.qps() / qps))) {
-            //        endpoint = e;
-            //        break;
-            //    }
-            //}
+            int clients = activeClient.addAndGet(1);
 
-            //endpoint.start();
-            //long start = System.nanoTime();
+            // qps 能力
+            double qps = 0;
+            for (Endpoint e : endpoints) {
+                qps += e.qps();
+            }
+            for (Endpoint e : endpoints) {
+                if(count % 10000 == 0){
+                    logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
+                }
+                if (e.getActive() < (clients * (e.qps() / qps))) {
+                    endpoint = e;
+                    break;
+                }
+            }
+
+            endpoint.start();
+            long start = System.nanoTime();
             Endpoint finalEndpoint = endpoint;
 
             RpcCallback callback = new RpcCallback() {
                 @Override
                 public void handler(RpcResponse response) {
-                    //long elapsed = System.nanoTime() - start;
-                    //finalEndpoint.finish(elapsed);
-                    //activeClient.decrementAndGet();
+                    long elapsed = System.nanoTime() - start;
+                    finalEndpoint.finish(elapsed);
+                    activeClient.decrementAndGet();
 
                     byte[] result = response.getBytes();
                     FullHttpResponse httpResponse = new DefaultFullHttpResponse(
