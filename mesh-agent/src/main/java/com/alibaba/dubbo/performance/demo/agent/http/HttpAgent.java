@@ -144,7 +144,7 @@ public class HttpAgent implements CommandLineRunner {
 
             int clients = activeClient.addAndGet(1);
 
-            if (count % (endpoints.size() * 2) == endpoints.size()) {
+            if (count % (endpoints.size() * 2) >= endpoints.size()) {
                 // 最低 延迟
                 long minAvgLatency = Long.MAX_VALUE;
                 for (Endpoint e : endpoints) {
