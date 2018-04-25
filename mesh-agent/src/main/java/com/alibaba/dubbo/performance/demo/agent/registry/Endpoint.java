@@ -12,7 +12,7 @@ public class Endpoint {
     private final int port;
     private RpcClient rpcClient;
     private AtomicLong times = new AtomicLong(0);
-    private AtomicDouble elapsed = new AtomicDouble(0);
+    private AtomicLong latency = new AtomicLong(0);
     private AtomicInteger active = new AtomicInteger(0);
 
     public Endpoint(String host,int port){
@@ -53,17 +53,19 @@ public class Endpoint {
         active.incrementAndGet();
     }
 
-    public void finish(long elapsed){
-        this.elapsed.addAndGet(elapsed);
+    public void finish(long latency){
+        this.latency.accumulateAndGet(latency, (long pre, long x)->{
+            return (pre*9+x)/10;
+        });
         times.incrementAndGet();
         active.decrementAndGet();
     }
 
-    public double qps(){
-        if(this.times.longValue() == 0 || this.elapsed.doubleValue() == 0){
-            return 1;
+    public long avgLatency(){
+        if(this.times.longValue() == 0 || this.latency.get() == 0){
+            return 0;
         }
-        return this.times.longValue()/(this.elapsed.doubleValue()/TimeUnit.SECONDS.toNanos(1));
+        return this.latency.get();
     }
 
     public int getActive(){
@@ -72,11 +74,5 @@ public class Endpoint {
 
     public long getTimes(){
         return this.times.longValue();
-    }
-
-    public void reset() {
-        this.times.set(0);
-        this.elapsed.set(0);
-        this.active.set(0);
     }
 }

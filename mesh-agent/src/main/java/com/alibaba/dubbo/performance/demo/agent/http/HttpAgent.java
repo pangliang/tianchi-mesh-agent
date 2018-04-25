@@ -46,6 +46,28 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
         ServerBootstrap b = NettyUtils.createServerBootstrap(32);
         try {
+
+            //new Thread(){
+            //    @Override
+            //    public void run()  {
+            //        while(true){
+            //            try {
+            //                Thread.sleep(1000);
+            //            } catch (InterruptedException e) {
+            //                e.printStackTrace();
+            //            }
+            //            if(endpoints == null){
+            //                continue ;
+            //            }
+            //            for (Endpoint e : endpoints) {
+            //                long avgLatency = e.avgLatency();
+            //                logger.info("clients:{}, endpoint:{}:{}, active:{}, avgLatency:{}, times:{}", activeClient.get(), e.getHost(), e.getPort(), e.getActive(), avgLatency, e.getTimes());
+            //            }
+            //        }
+            //
+            //    }
+            //}.start();
+
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
@@ -95,18 +117,15 @@ public class HttpAgent implements CommandLineRunner {
 
             int clients = activeClient.addAndGet(1);
 
-            // qps 能力
-            double qps = 0;
-            for (Endpoint e : endpoints) {
-                qps += e.qps();
-            }
-            for (Endpoint e : endpoints) {
-                if(count % 10000 == 0){
-                    logger.info("clients:{}, allqps:{}, endpoint:{}:{}, active:{}, qps:{}, times:{}", clients, qps, e.getHost(), e.getPort(), e.getActive(), e.qps(), e.getTimes());
-                }
-                if (e.getActive() < (clients * (e.qps() / qps))) {
-                    endpoint = e;
-                    break;
+            if(count % 10 >= 5){
+                // 最低 延迟
+                long minAvgLatency = Long.MAX_VALUE;
+                for (Endpoint e : endpoints) {
+                    long avgLatency = e.avgLatency();
+                    if(avgLatency < minAvgLatency){
+                        minAvgLatency = avgLatency;
+                        endpoint = e;
+                    }
                 }
             }
 
