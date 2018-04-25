@@ -44,7 +44,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap b = NettyUtils.createServerBootstrap(32);
+        ServerBootstrap b = NettyUtils.createServerBootstrap(16);
         try {
 
             //new Thread(){
@@ -52,7 +52,7 @@ public class HttpAgent implements CommandLineRunner {
             //    public void run()  {
             //        while(true){
             //            try {
-            //                Thread.sleep(1000);
+            //                Thread.sleep(1000 * 3);
             //            } catch (InterruptedException e) {
             //                e.printStackTrace();
             //            }
@@ -67,6 +67,15 @@ public class HttpAgent implements CommandLineRunner {
             //
             //    }
             //}.start();
+
+            if (null == endpoints) {
+                synchronized (lock) {
+                    if (null == endpoints) {
+                        endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
+                        logger.info("endpoints: {}", endpoints);
+                    }
+                }
+            }
 
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
@@ -91,16 +100,12 @@ public class HttpAgent implements CommandLineRunner {
         int paramLen = paramName.length();
 
         @Override
-        public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg) throws Exception {
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            //logger.info("channelActive:{}", ctx.channel().remoteAddress());
+        }
 
-            if (null == endpoints) {
-                synchronized (lock) {
-                    if (null == endpoints) {
-                        endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
-                        logger.info("endpoints: {}", endpoints);
-                    }
-                }
-            }
+        @Override
+        public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg) throws Exception {
 
             String body = msg.content().toString(Charset.defaultCharset());
 
@@ -117,7 +122,7 @@ public class HttpAgent implements CommandLineRunner {
 
             int clients = activeClient.addAndGet(1);
 
-            if(count % 10 >= 5){
+            if(count % (endpoints.size()*2) == endpoints.size()){
                 // 最低 延迟
                 long minAvgLatency = Long.MAX_VALUE;
                 for (Endpoint e : endpoints) {

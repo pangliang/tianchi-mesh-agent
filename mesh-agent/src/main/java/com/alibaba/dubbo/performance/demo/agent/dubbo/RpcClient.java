@@ -20,7 +20,7 @@ public class RpcClient {
     private String host;
     private int port;
     private Object lock = new Object();
-    private int channelSize = 16;
+    private int channelSize = 4;
     private Channel[] channels;
     private AtomicInteger count = new AtomicInteger(0);
 
@@ -49,8 +49,6 @@ public class RpcClient {
         request.setTwoWay(true);
         request.setData(invocation);
 
-        //logger.info("requestId=" + request.getId());
-
         RpcRequestHolder.put(String.valueOf(request.getId()), callback);
 
         channel.writeAndFlush(request);
@@ -60,7 +58,7 @@ public class RpcClient {
         if (null == channels) {
             synchronized (lock) {
                 if (null == channels) {
-                    Bootstrap bootstrap = NettyUtils.createBootstrap(16)
+                    Bootstrap bootstrap = NettyUtils.createBootstrap(4)
                         .handler(new ChannelInitializer<SocketChannel>() {
                             @Override
                             protected void initChannel(SocketChannel socketChannel) {
