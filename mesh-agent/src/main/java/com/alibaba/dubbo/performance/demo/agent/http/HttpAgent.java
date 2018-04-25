@@ -1,27 +1,31 @@
 package com.alibaba.dubbo.performance.demo.agent.http;
 
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.*;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcDecoder;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcEncoder;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClientHandler;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Request;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcCallback;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcRequestHolder;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcResponse;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
 import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
+import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.buffer.Unpooled;
-import io.netty.channel.*;
+import io.netty.channel.ChannelFutureListener;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
-import io.netty.handler.logging.LogLevel;
-import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
 
-import java.io.ByteArrayOutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -37,24 +41,33 @@ public class HttpAgent implements CommandLineRunner {
 
     private static IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
     private static List<Endpoint> endpoints = null;
-    private static Object lock = new Object();
     private static AtomicInteger counter = new AtomicInteger(0);
     private static AtomicInteger activeClient = new AtomicInteger(0);
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap b = NettyUtils.createServerBootstrap(16);
+        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(16);
         try {
-            if (null == endpoints) {
-                synchronized (lock) {
-                    if (null == endpoints) {
-                        endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
-                        logger.info("endpoints: {}", endpoints);
+            endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
+            logger.info("endpoints: {}", endpoints);
+
+            Bootstrap b = NettyUtils.createBootstrap(serverBootstrap.config().childGroup())
+                .handler(new ChannelInitializer<SocketChannel>() {
+                    @Override
+                    protected void initChannel(SocketChannel ch) {
+                        ch.pipeline().addLast(
+                            new DubboRpcEncoder(),
+                            new DubboRpcDecoder(),
+                            new RpcClientHandler()
+                        );
                     }
-                }
+                });
+
+            for (Endpoint e : endpoints) {
+                e.setChannel(b.connect(e.getHost(), e.getPort()).sync().channel());
             }
 
-            b.childHandler(new ChannelInitializer<SocketChannel>() {
+            serverBootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
                     ch.pipeline().addLast(
@@ -66,14 +79,16 @@ public class HttpAgent implements CommandLineRunner {
                 }
             }).bind(localPort).sync().channel().closeFuture().sync();
         } finally {
-            b.config().group().shutdownGracefully();
-            b.config().childGroup().shutdownGracefully();
+            serverBootstrap.config().group().shutdownGracefully();
+            serverBootstrap.config().childGroup().shutdownGracefully();
         }
     }
 
     static class HttpHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         private Logger logger = LoggerFactory.getLogger(HttpHandler.class);
-        private static String params = "interface=com.alibaba.dubbo.performance.demo.provider.IHelloService&method=hash&parameterTypesString=Ljava%2Flang%2FString%3B&parameter=";
+        private static String params
+            = "interface=com.alibaba.dubbo.performance.demo.provider"
+            + ".IHelloService&method=hash&parameterTypesString=Ljava%2Flang%2FString%3B&parameter=";
         private static int paramsLen = params.length();
 
         @Override
@@ -88,7 +103,6 @@ public class HttpAgent implements CommandLineRunner {
             int dataLen = contentLength - paramsLen;
             byte[] data = new byte[dataLen];
             msg.content().getBytes(paramsLen, data);
-
 
             final Endpoint endpoint = getEndpoint();
             endpoint.start();
@@ -123,19 +137,19 @@ public class HttpAgent implements CommandLineRunner {
 
         }
 
-        private Endpoint getEndpoint(){
+        private Endpoint getEndpoint() {
             // 轮询
             int count = counter.addAndGet(1);
             Endpoint endpoint = endpoints.get(count % endpoints.size());
 
             int clients = activeClient.addAndGet(1);
 
-            if(count % (endpoints.size()*2) == endpoints.size()){
+            if (count % (endpoints.size() * 2) == endpoints.size()) {
                 // 最低 延迟
                 long minAvgLatency = Long.MAX_VALUE;
                 for (Endpoint e : endpoints) {
                     long avgLatency = e.avgLatency();
-                    if(avgLatency < minAvgLatency){
+                    if (avgLatency < minAvgLatency) {
                         minAvgLatency = avgLatency;
                         endpoint = e;
                     }

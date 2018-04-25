@@ -35,13 +35,17 @@ public class NettyUtils {
             .childOption(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
     }
 
-    public static Bootstrap createBootstrap(int nThreads){
-        EventLoopGroup eventLoopGroup = NettyUtils.createEventLoopGroup(nThreads);
+    public static Bootstrap createBootstrap(EventLoopGroup eventLoopGroup){
         return new Bootstrap()
             .group(eventLoopGroup)
             .channel(IS_LINUX ? EpollSocketChannel.class : NioSocketChannel.class)
             .option(ChannelOption.SO_KEEPALIVE, true)
             .option(ChannelOption.TCP_NODELAY, true)
             .option(ChannelOption.ALLOCATOR, PooledByteBufAllocator.DEFAULT);
+    }
+
+    public static Bootstrap createBootstrap(int nThreads){
+        EventLoopGroup eventLoopGroup = NettyUtils.createEventLoopGroup(nThreads);
+        return createBootstrap(eventLoopGroup);
     }
 }
