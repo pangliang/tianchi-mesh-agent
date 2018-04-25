@@ -1,7 +1,6 @@
 package com.alibaba.dubbo.performance.demo.agent.http;
 
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcCallback;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcResponse;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.*;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
@@ -11,12 +10,17 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
 
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -29,12 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 @ConditionalOnNotWebApplication
 public class HttpAgent implements CommandLineRunner {
     private Logger logger = LoggerFactory.getLogger(HttpAgent.class);
-
     private int localPort = Integer.valueOf(System.getProperty("server.port"));
-
-    private static String interfaceName = "com.alibaba.dubbo.performance.demo.provider.IHelloService";
-    private static String method = "hash";
-    private static String parameterTypesString = "Ljava/lang/String;";
 
     private static IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
     private static List<Endpoint> endpoints = null;
@@ -46,28 +45,6 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
         ServerBootstrap b = NettyUtils.createServerBootstrap(16);
         try {
-
-            //new Thread(){
-            //    @Override
-            //    public void run()  {
-            //        while(true){
-            //            try {
-            //                Thread.sleep(1000 * 3);
-            //            } catch (InterruptedException e) {
-            //                e.printStackTrace();
-            //            }
-            //            if(endpoints == null){
-            //                continue ;
-            //            }
-            //            for (Endpoint e : endpoints) {
-            //                long avgLatency = e.avgLatency();
-            //                logger.info("clients:{}, endpoint:{}:{}, active:{}, avgLatency:{}, times:{}", activeClient.get(), e.getHost(), e.getPort(), e.getActive(), avgLatency, e.getTimes());
-            //            }
-            //        }
-            //
-            //    }
-            //}.start();
-
             if (null == endpoints) {
                 synchronized (lock) {
                     if (null == endpoints) {
@@ -94,10 +71,10 @@ public class HttpAgent implements CommandLineRunner {
         }
     }
 
-    class HttpHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
+    static class HttpHandler extends SimpleChannelInboundHandler<FullHttpRequest> {
         private Logger logger = LoggerFactory.getLogger(HttpHandler.class);
-        String paramName = "&parameter=";
-        int paramLen = paramName.length();
+        private static String params = "interface=com.alibaba.dubbo.performance.demo.provider.IHelloService&method=hash&parameterTypesString=Ljava%2Flang%2FString%3B&parameter=";
+        private static int paramsLen = params.length();
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -107,15 +84,46 @@ public class HttpAgent implements CommandLineRunner {
         @Override
         public void channelRead0(ChannelHandlerContext ctx, FullHttpRequest msg) throws Exception {
 
-            String body = msg.content().toString(Charset.defaultCharset());
+            int contentLength = msg.headers().getInt("Content-Length");
+            int dataLen = contentLength - paramsLen;
+            byte[] data = new byte[dataLen];
+            msg.content().getBytes(paramsLen, data);
 
-            int pos = body.indexOf(paramName);
-            if (pos < 0) {
-                return;
-            }
 
-            String parameter = body.substring(pos + paramLen);
+            final Endpoint endpoint = getEndpoint();
+            endpoint.start();
+            long start = System.nanoTime();
 
+            RpcCallback callback = new RpcCallback() {
+                @Override
+                public void handler(RpcResponse response) {
+                    long elapsed = System.nanoTime() - start;
+                    endpoint.finish(elapsed);
+                    activeClient.decrementAndGet();
+
+                    byte[] result = response.getBytes();
+                    FullHttpResponse httpResponse = new DefaultFullHttpResponse(
+                        HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
+                        Unpooled.wrappedBuffer(result));
+
+                    httpResponse.headers().add("Content-Length", result.length);
+
+                    ctx.channel().writeAndFlush(httpResponse);
+                }
+            };
+
+            Request request = new Request();
+            request.setVersion("2.0.0");
+            request.setTwoWay(true);
+            request.setData(data);
+
+            RpcRequestHolder.put(String.valueOf(request.getId()), callback);
+
+            endpoint.getChannel().writeAndFlush(request);
+
+        }
+
+        private Endpoint getEndpoint(){
             // 轮询
             int count = counter.addAndGet(1);
             Endpoint endpoint = endpoints.get(count % endpoints.size());
@@ -133,31 +141,7 @@ public class HttpAgent implements CommandLineRunner {
                     }
                 }
             }
-
-            endpoint.start();
-            long start = System.nanoTime();
-            Endpoint finalEndpoint = endpoint;
-
-            RpcCallback callback = new RpcCallback() {
-                @Override
-                public void handler(RpcResponse response) {
-                    long elapsed = System.nanoTime() - start;
-                    finalEndpoint.finish(elapsed);
-                    activeClient.decrementAndGet();
-
-                    byte[] result = response.getBytes();
-                    FullHttpResponse httpResponse = new DefaultFullHttpResponse(
-                        HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
-                        Unpooled.wrappedBuffer(result));
-
-                    httpResponse.headers().add("Content-Length", result.length);
-
-                    ctx.channel().writeAndFlush(httpResponse);
-                }
-            };
-
-            endpoint.getRpcClient().invoke(interfaceName, method, parameterTypesString, parameter, callback);
-
+            return endpoint;
         }
 
         @Override

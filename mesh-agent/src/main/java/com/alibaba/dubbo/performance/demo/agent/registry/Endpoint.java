@@ -1,52 +1,40 @@
 package com.alibaba.dubbo.performance.demo.agent.registry;
 
-import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClient;
-import com.google.common.util.concurrent.AtomicDouble;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcDecoder;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcEncoder;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClientHandler;
+import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
+import io.netty.bootstrap.Bootstrap;
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelInitializer;
+import io.netty.channel.socket.SocketChannel;
 
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class Endpoint {
-    private final String host;
-    private final int port;
-    private RpcClient rpcClient;
+    private static Bootstrap bootstrap = NettyUtils.createBootstrap(4)
+        .handler(new ChannelInitializer<SocketChannel>() {
+            @Override
+            protected void initChannel(SocketChannel ch) {
+                ch.pipeline().addLast(
+                    new DubboRpcEncoder(),
+                    new DubboRpcDecoder(),
+                    new RpcClientHandler()
+                );
+            }
+        });
+    private Channel channel;
     private AtomicLong times = new AtomicLong(0);
     private AtomicLong latency = new AtomicLong(0);
     private AtomicInteger active = new AtomicInteger(0);
 
-    public Endpoint(String host,int port){
-        this.host = host;
-        this.port = port;
-        this.rpcClient = new RpcClient(host, port);
+    public Endpoint(String host,int port) throws InterruptedException {
+        this.channel = bootstrap.connect(host, port).sync().channel();
     }
 
-    public String getHost() {
-        return host;
-    }
-
-    public int getPort() {
-        return port;
-    }
-
-    public String toString(){
-        return host + ":" + port;
-    }
-
-    public boolean equals(Object o){
-        if (!(o instanceof Endpoint)){
-            return false;
-        }
-        Endpoint other = (Endpoint) o;
-        return other.host.equals(this.host) && other.port == this.port;
-    }
-
-    public int hashCode(){
-        return host.hashCode() + port;
-    }
-
-    public RpcClient getRpcClient() {
-        return rpcClient;
+    public Channel getChannel() {
+        return channel;
     }
 
     public void start(){
@@ -54,9 +42,7 @@ public class Endpoint {
     }
 
     public void finish(long latency){
-        this.latency.accumulateAndGet(latency, (long pre, long x)->{
-            return (pre*9+x)/10;
-        });
+        this.latency.accumulateAndGet(latency, (long pre, long x)-> (pre*9+x)/10);
         times.incrementAndGet();
         active.decrementAndGet();
     }
