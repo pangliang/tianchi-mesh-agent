@@ -47,26 +47,26 @@ public class HttpAgent implements CommandLineRunner {
         ServerBootstrap b = NettyUtils.createServerBootstrap(32);
         try {
 
-            //new Thread(){
-            //    @Override
-            //    public void run()  {
-            //        while(true){
-            //            try {
-            //                Thread.sleep(1000);
-            //            } catch (InterruptedException e) {
-            //                e.printStackTrace();
-            //            }
-            //            if(endpoints == null){
-            //                continue ;
-            //            }
-            //            for (Endpoint e : endpoints) {
-            //                long avgLatency = e.avgLatency();
-            //                logger.info("clients:{}, endpoint:{}:{}, active:{}, avgLatency:{}, times:{}", activeClient.get(), e.getHost(), e.getPort(), e.getActive(), avgLatency, e.getTimes());
-            //            }
-            //        }
-            //
-            //    }
-            //}.start();
+            new Thread(){
+                @Override
+                public void run()  {
+                    while(true){
+                        try {
+                            Thread.sleep(1000 * 3);
+                        } catch (InterruptedException e) {
+                            e.printStackTrace();
+                        }
+                        if(endpoints == null){
+                            continue ;
+                        }
+                        for (Endpoint e : endpoints) {
+                            long avgLatency = e.avgLatency();
+                            logger.info("clients:{}, endpoint:{}:{}, active:{}, avgLatency:{}, times:{}", activeClient.get(), e.getHost(), e.getPort(), e.getActive(), avgLatency, e.getTimes());
+                        }
+                    }
+
+                }
+            }.start();
 
             b.childHandler(new ChannelInitializer<SocketChannel>() {
                 @Override
