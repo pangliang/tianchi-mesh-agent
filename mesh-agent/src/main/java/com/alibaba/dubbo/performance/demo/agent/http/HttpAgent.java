@@ -3,17 +3,17 @@ package com.alibaba.dubbo.performance.demo.agent.http;
 import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcDecoder;
 import com.alibaba.dubbo.performance.demo.agent.dubbo.DubboRpcEncoder;
 import com.alibaba.dubbo.performance.demo.agent.dubbo.RpcClientHandler;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.Request;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcCallback;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcRequestHolder;
-import com.alibaba.dubbo.performance.demo.agent.dubbo.model.RpcResponse;
+import com.alibaba.dubbo.performance.demo.agent.dubbo.model.*;
 import com.alibaba.dubbo.performance.demo.agent.registry.Endpoint;
 import com.alibaba.dubbo.performance.demo.agent.registry.EtcdRegistry;
 import com.alibaba.dubbo.performance.demo.agent.registry.IRegistry;
 import com.alibaba.dubbo.performance.demo.agent.utils.NettyUtils;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import io.netty.buffer.UnpooledDirectByteBuf;
+import io.netty.buffer.UnpooledUnsafeDirectByteBuf;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -78,9 +78,9 @@ public class HttpAgent implements CommandLineRunner {
                 @Override
                 protected void initChannel(SocketChannel ch) throws Exception {
                     ch.pipeline().addLast(
+                        //new LoggingHandler(LogLevel.INFO),
                         new HttpRequestDecoder(),
                         new HttpObjectAggregator(2048),
-                        new HttpResponseEncoder(),
                         new HttpHandler()
                     );
                 }
@@ -97,6 +97,11 @@ public class HttpAgent implements CommandLineRunner {
             = "interface=com.alibaba.dubbo.performance.demo.provider"
             + ".IHelloService&method=hash&parameterTypesString=Ljava%2Flang%2FString%3B&parameter=";
         private static int paramsLen = params.length();
+
+        private static byte[] responseHeader= ("HTTP/1.1 200 OK\n"
+            +"Connection: keep-alive\n"
+            +"Content-Type: text/plain;charset=UTF-8\n"
+            +"Content-Length: ").getBytes();
 
         @Override
         public void channelActive(ChannelHandlerContext ctx) throws Exception {
@@ -123,13 +128,12 @@ public class HttpAgent implements CommandLineRunner {
                     activeClient.decrementAndGet();
 
                     byte[] result = response.getBytes();
-                    FullHttpResponse httpResponse = new DefaultFullHttpResponse(
-                        HttpVersion.HTTP_1_1, HttpResponseStatus.OK,
-                        Unpooled.wrappedBuffer(result));
-
-                    httpResponse.headers().add("Content-Length", result.length);
-
-                    ctx.channel().writeAndFlush(httpResponse);
+                    ByteBuf buf = Unpooled.wrappedBuffer(
+                        responseHeader,
+                        (result.length+"\n\n").getBytes(),
+                        result
+                    );
+                    ctx.channel().writeAndFlush(buf);
                 }
             };
 
@@ -153,9 +157,9 @@ public class HttpAgent implements CommandLineRunner {
             // 按1:2:3
             int count = counter.addAndGet(1);
 
-            //if(endpoints.size() < 3){
-            //    return endpoints.get(count % endpoints.size());
-            //}
+            if(endpoints.size() < 3){
+                return endpoints.get(count % endpoints.size());
+            }
 
             int index = count % 6;
             switch (index) {
