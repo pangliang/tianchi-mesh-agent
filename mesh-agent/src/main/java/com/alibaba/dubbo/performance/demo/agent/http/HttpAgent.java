@@ -144,20 +144,17 @@ public class HttpAgent implements CommandLineRunner {
 
             int clients = activeClient.addAndGet(1);
 
-            double allQPS = 0;
-            for (Endpoint e : endpoints){
-                allQPS += e.qps();
-            }
-
-            for (Endpoint e : endpoints){
-                // 当前 active 负载小于按qps 所能承担的比重;
-                // 总qps 100, 当前 endpoint qps 10, 则应该分到 10% 的请求
-                if (e.getActive() < (clients * (e.qps() / allQPS))) {
-                    endpoint = e;
-                    break;
+            if (count % (endpoints.size() * 2) >= endpoints.size()) {
+                // 最低 延迟
+                long minAvgLatency = Long.MAX_VALUE;
+                for (Endpoint e : endpoints) {
+                    long avgLatency = e.avgLatency();
+                    if (avgLatency < minAvgLatency) {
+                        minAvgLatency = avgLatency;
+                        endpoint = e;
+                    }
                 }
             }
-
             return endpoint;
         }
 
