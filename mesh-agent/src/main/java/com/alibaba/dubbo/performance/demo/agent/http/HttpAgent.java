@@ -20,6 +20,8 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -57,6 +59,7 @@ public class HttpAgent implements CommandLineRunner {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline().addLast(
+                            //new LoggingHandler(LogLevel.INFO),
                             new DubboRpcEncoder(),
                             new DubboRpcDecoder(),
                             new RpcClientHandler()
@@ -140,6 +143,11 @@ public class HttpAgent implements CommandLineRunner {
         }
 
         private Endpoint getEndpoint() {
+            ////本地
+            //if(endpoints.size() == 1){
+            //    return endpoints.get(0);
+            //}
+
             // 按1:2:3
             int count = counter.addAndGet(1);
             int index = count % 6;

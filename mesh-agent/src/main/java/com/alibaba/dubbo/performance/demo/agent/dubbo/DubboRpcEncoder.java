@@ -95,26 +95,23 @@ public class DubboRpcEncoder extends MessageToByteEncoder{
     protected void encode(ChannelHandlerContext ctx, Object msg, ByteBuf buffer) throws Exception {
         Request req = (Request)msg;
 
-        // header.
-        byte[] header = new byte[HEADER_LENGTH];
-        // set magic number.
-        Bytes.short2bytes(MAGIC, header);
+        buffer.writeShort(MAGIC);
 
         // set request and serialization flag.
-        header[2] = (byte) (FLAG_REQUEST | 6);
+        byte flag = (byte) (FLAG_REQUEST | 6);
+        if (req.isTwoWay()) flag |= FLAG_TWOWAY;
+        if (req.isEvent()) flag |= FLAG_EVENT;
+        buffer.writeByte(flag);
 
-        if (req.isTwoWay()) header[2] |= FLAG_TWOWAY;
-        if (req.isEvent()) header[2] |= FLAG_EVENT;
+        buffer.writeByte(0);
 
         // set request id.
-        Bytes.long2bytes(req.getId(), header, 4);
+        buffer.writeLong(req.getId());
+
+        byte[] data = (byte[])req.getData();
 
         // data len.
-        byte[] data = (byte[])req.getData();
-        Bytes.int2bytes(len + data.length, header, 12);
-
-        // write header.
-        buffer.writeBytes(header);
+        buffer.writeInt(len + data.length);
 
         buffer.writeBytes(part1);
         buffer.writeBytes(data);
