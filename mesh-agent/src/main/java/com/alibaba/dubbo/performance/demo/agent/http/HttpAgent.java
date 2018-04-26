@@ -26,6 +26,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -40,7 +41,7 @@ public class HttpAgent implements CommandLineRunner {
     private int localPort = Integer.valueOf(System.getProperty("server.port"));
 
     private static IRegistry registry = new EtcdRegistry(System.getProperty("etcd.url"));
-    private static List<Endpoint> endpoints = null;
+    private static List<Endpoint> endpoints = new ArrayList<>(3);
     private static AtomicInteger counter = new AtomicInteger(0);
     private static AtomicInteger activeClient = new AtomicInteger(0);
 
@@ -48,8 +49,8 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
         ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(16);
         try {
-            endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
-            logger.info("endpoints: {}", endpoints);
+            List<Endpoint> endpointList = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
+            logger.info("endpointList: {}", endpointList);
 
             Bootstrap b = NettyUtils.createBootstrap(serverBootstrap.config().childGroup())
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -63,8 +64,9 @@ public class HttpAgent implements CommandLineRunner {
                     }
                 });
 
-            for (Endpoint e : endpoints) {
+            for (Endpoint e : endpointList) {
                 e.setChannel(b.connect(e.getHost(), e.getPort()).sync().channel());
+                endpoints.add(e.getPort() % endpointList.size(), e);
             }
 
             serverBootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
@@ -138,24 +140,19 @@ public class HttpAgent implements CommandLineRunner {
         }
 
         private Endpoint getEndpoint() {
-            // 轮询
+            // 按1:2:3
             int count = counter.addAndGet(1);
-            Endpoint endpoint = endpoints.get(count % endpoints.size());
-
-            int clients = activeClient.addAndGet(1);
-
-            if (count % (endpoints.size() * 2) >= endpoints.size()) {
-                // 最低 延迟
-                long minAvgLatency = Long.MAX_VALUE;
-                for (Endpoint e : endpoints) {
-                    long avgLatency = e.avgLatency();
-                    if (avgLatency < minAvgLatency) {
-                        minAvgLatency = avgLatency;
-                        endpoint = e;
-                    }
-                }
+            int index = count % 6;
+            switch (index) {
+                case 0:
+                    return endpoints.get(0);
+                case 1:
+                case 2:
+                    return endpoints.get(1);
+                default:
+                    return endpoints.get(2);
             }
-            return endpoint;
+
         }
 
         @Override
