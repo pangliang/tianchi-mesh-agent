@@ -29,6 +29,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnNotWebApplication;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -51,8 +52,8 @@ public class HttpAgent implements CommandLineRunner {
     public void run(String... strings) throws Exception {
         ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(4);
         try {
-            List<Endpoint> endpointList = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
-            logger.info("endpointList: {}", endpointList);
+            endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
+            logger.info("endpointList: {}", endpoints);
 
             Bootstrap b = NettyUtils.createBootstrap(serverBootstrap.config().childGroup())
                 .handler(new ChannelInitializer<SocketChannel>() {
@@ -67,9 +68,10 @@ public class HttpAgent implements CommandLineRunner {
                     }
                 });
 
-            for (Endpoint e : endpointList) {
+            endpoints.sort(Comparator.comparingInt(Endpoint::getPort));
+
+            for (Endpoint e : endpoints) {
                 e.setChannel(b.connect(e.getHost(), e.getPort()).sync().channel());
-                endpoints.add(e.getPort() % endpointList.size(), e);
             }
 
             serverBootstrap.childHandler(new ChannelInitializer<SocketChannel>() {
@@ -77,7 +79,7 @@ public class HttpAgent implements CommandLineRunner {
                 protected void initChannel(SocketChannel ch) throws Exception {
                     ch.pipeline().addLast(
                         new HttpRequestDecoder(),
-                        new HttpObjectAggregator(4096),
+                        new HttpObjectAggregator(2048),
                         new HttpResponseEncoder(),
                         new HttpHandler()
                     );
@@ -150,6 +152,11 @@ public class HttpAgent implements CommandLineRunner {
 
             // 按1:2:3
             int count = counter.addAndGet(1);
+
+            //if(endpoints.size() < 3){
+            //    return endpoints.get(count % endpoints.size());
+            //}
+
             int index = count % 6;
             switch (index) {
                 case 0:
