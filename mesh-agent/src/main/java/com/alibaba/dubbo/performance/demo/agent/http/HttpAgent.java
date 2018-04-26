@@ -47,7 +47,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(16);
+        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(4);
         try {
             List<Endpoint> endpointList = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
             logger.info("endpointList: {}", endpointList);
