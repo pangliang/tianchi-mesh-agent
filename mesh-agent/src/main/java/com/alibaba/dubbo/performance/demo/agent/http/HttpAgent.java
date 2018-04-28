@@ -142,7 +142,7 @@ public class HttpAgent implements CommandLineRunner {
             request.setTwoWay(true);
             request.setData(data);
 
-            RpcRequestHolder.put(String.valueOf(request.getId()), callback);
+            RpcRequestHolder.put(request.getId(), callback);
 
             endpoint.getChannel().writeAndFlush(request);
 
