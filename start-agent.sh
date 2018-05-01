@@ -16,8 +16,8 @@ JAVA_OPTS="${JAVA_OPTS} -XX:+UseConcMarkSweepGC -XX:CMSMaxAbortablePrecleanTime=
 JAVA_OPTS="${JAVA_OPTS} -XX:+CMSClassUnloadingEnabled -XX:CMSInitiatingOccupancyFraction=80 -XX:+UseCMSInitiatingOccupancyOnly"
 JAVA_OPTS="${JAVA_OPTS} -XX:+ExplicitGCInvokesConcurrent -Dsun.rmi.dgc.server.gcInterval=2592000000 -Dsun.rmi.dgc.client.gcInterval=2592000000"
 JAVA_OPTS="${JAVA_OPTS} -Dio.netty.leakDetectionLevel=DISABLED"
-JAVA_OPTS="${JAVA_OPTS} -XX:+DisableExplicitGC"
 
+#JAVA_OPTS="${JAVA_OPTS} -XX:+DisableExplicitGC"
 #JAVA_OPTS="${JAVA_OPTS} -XX:+PrintGCDetails -XX:+PrintGCDateStamps"
 
 

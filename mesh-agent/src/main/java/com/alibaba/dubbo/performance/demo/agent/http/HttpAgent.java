@@ -14,10 +14,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.buffer.UnpooledDirectByteBuf;
 import io.netty.buffer.UnpooledUnsafeDirectByteBuf;
-import io.netty.channel.ChannelFutureListener;
-import io.netty.channel.ChannelHandlerContext;
-import io.netty.channel.ChannelInitializer;
-import io.netty.channel.SimpleChannelInboundHandler;
+import io.netty.channel.*;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.logging.LogLevel;
@@ -51,6 +48,7 @@ public class HttpAgent implements CommandLineRunner {
     @Override
     public void run(String... strings) throws Exception {
         ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(4);
+        serverBootstrap.childOption(ChannelOption.SO_KEEPALIVE, false);
         try {
             endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
             logger.info("endpointList: {}", endpoints);
@@ -99,8 +97,8 @@ public class HttpAgent implements CommandLineRunner {
         private static int paramsLen = params.length();
 
         private static byte[] responseHeader= ("HTTP/1.1 200 OK\n"
-            +"Connection: keep-alive\n"
-            +"Content-Type: text/plain;charset=UTF-8\n"
+            //+"Connection: keep-alive\n"
+            //+"Content-Type: text/plain;charset=UTF-8\n"
             +"Content-Length: ").getBytes();
 
         @Override
