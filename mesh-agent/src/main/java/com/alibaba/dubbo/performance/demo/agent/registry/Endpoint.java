@@ -2,6 +2,7 @@ package com.alibaba.dubbo.performance.demo.agent.registry;
 
 import io.netty.channel.Channel;
 
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -39,7 +40,8 @@ public class Endpoint {
     }
 
     public void finish(long latency) {
-        this.latency.accumulateAndGet(latency, (long pre, long x) -> (pre * 9 + x) / 10);
+        this.latency.addAndGet(latency);
+        //this.latency.accumulateAndGet(latency, (long pre, long x) -> (pre * 9 + x) / 10);
         times.incrementAndGet();
         active.decrementAndGet();
     }
@@ -49,6 +51,13 @@ public class Endpoint {
             return 0;
         }
         return this.latency.get();
+    }
+
+    public double qps() {
+        if (this.times.longValue() == 0 || this.latency.get() == 0) {
+            return 1;
+        }
+        return TimeUnit.SECONDS.toNanos(1)/(this.latency.get()/(double)this.times.get());
     }
 
     public int getActive() {

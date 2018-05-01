@@ -47,8 +47,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(4);
-        serverBootstrap.childOption(ChannelOption.SO_KEEPALIVE, false);
+        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(8);
         try {
             endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
             logger.info("endpointList: {}", endpoints);
@@ -97,7 +96,7 @@ public class HttpAgent implements CommandLineRunner {
         private static int paramsLen = params.length();
 
         private static byte[] responseHeader= ("HTTP/1.1 200 OK\n"
-            //+"Connection: keep-alive\n"
+            +"Connection: keep-alive\n"
             //+"Content-Type: text/plain;charset=UTF-8\n"
             +"Content-Length: ").getBytes();
 
@@ -114,7 +113,7 @@ public class HttpAgent implements CommandLineRunner {
             byte[] data = new byte[dataLen];
             msg.content().getBytes(paramsLen, data);
 
-            final Endpoint endpoint = getEndpoint();
+            final Endpoint endpoint = getEndpoint2();
             endpoint.start();
             long start = System.nanoTime();
 
@@ -171,6 +170,31 @@ public class HttpAgent implements CommandLineRunner {
             }
 
         }
+
+        private Endpoint getEndpoint2() {
+            // 轮询
+            int count = counter.addAndGet(1);
+            Endpoint endpoint = endpoints.get(count % endpoints.size());
+
+            int clients = activeClient.addAndGet(1);
+
+            double allQPS = 0;
+            for (Endpoint e : endpoints){
+                allQPS += e.qps();
+            }
+
+            for (Endpoint e : endpoints){
+                // 当前 active 负载小于按qps 所能承担的比重;
+                // 总qps 100, 当前 endpoint qps 10, 则应该分到 10% 的请求
+                if (e.getActive() < (clients * (e.qps() / allQPS))) {
+                    endpoint = e;
+                    break;
+                }
+            }
+
+            return endpoint;
+        }
+
 
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
