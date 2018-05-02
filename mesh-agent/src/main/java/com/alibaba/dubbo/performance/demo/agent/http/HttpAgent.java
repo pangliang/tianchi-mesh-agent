@@ -47,7 +47,7 @@ public class HttpAgent implements CommandLineRunner {
 
     @Override
     public void run(String... strings) throws Exception {
-        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(8);
+        ServerBootstrap serverBootstrap = NettyUtils.createServerBootstrap(4);
         try {
             endpoints = registry.find("com.alibaba.dubbo.performance.demo.provider.IHelloService");
             logger.info("endpointList: {}", endpoints);
@@ -113,16 +113,16 @@ public class HttpAgent implements CommandLineRunner {
             byte[] data = new byte[dataLen];
             msg.content().getBytes(paramsLen, data);
 
-            final Endpoint endpoint = getEndpoint2();
-            endpoint.start();
-            long start = System.nanoTime();
+            final Endpoint endpoint = getEndpoint3();
+            //endpoint.start();
+            //long start = System.nanoTime();
 
             RpcCallback callback = new RpcCallback() {
                 @Override
                 public void handler(RpcResponse response) {
-                    long elapsed = System.nanoTime() - start;
-                    endpoint.finish(elapsed);
-                    activeClient.decrementAndGet();
+                    //long elapsed = System.nanoTime() - start;
+                    //endpoint.finish(0);
+                    //activeClient.decrementAndGet();
 
                     byte[] result = response.getBytes();
                     ByteBuf buf = Unpooled.wrappedBuffer(
@@ -193,6 +193,26 @@ public class HttpAgent implements CommandLineRunner {
             }
 
             return endpoint;
+        }
+
+        private Endpoint getEndpoint3() {
+            // 按1:2:2
+            int count = counter.addAndGet(1);
+
+            //if(endpoints.size() < 3){
+            //    return endpoints.get(count % endpoints.size());
+            //}
+
+            int index = count % 5;
+            switch (index) {
+                case 0:
+                    return endpoints.get(0);
+                case 1:
+                case 2:
+                    return endpoints.get(1);
+                default:
+                    return endpoints.get(2);
+            }
         }
 
 
