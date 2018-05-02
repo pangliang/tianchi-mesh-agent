@@ -40,8 +40,7 @@ public class Endpoint {
     }
 
     public void finish(long latency) {
-        this.latency.addAndGet(latency);
-        //this.latency.accumulateAndGet(latency, (long pre, long x) -> (pre * 9 + x) / 10);
+        this.latency.accumulateAndGet(latency, (long pre, long x) -> (pre * 99 + x) / 100);
         times.incrementAndGet();
         active.decrementAndGet();
     }
@@ -51,13 +50,6 @@ public class Endpoint {
             return 0;
         }
         return this.latency.get();
-    }
-
-    public double qps() {
-        if (this.times.longValue() == 0 || this.latency.get() == 0) {
-            return 1;
-        }
-        return TimeUnit.SECONDS.toNanos(1)/(this.latency.get()/(double)this.times.get());
     }
 
     public int getActive() {

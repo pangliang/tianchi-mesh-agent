@@ -113,16 +113,16 @@ public class HttpAgent implements CommandLineRunner {
             byte[] data = new byte[dataLen];
             msg.content().getBytes(paramsLen, data);
 
-            final Endpoint endpoint = getEndpoint3();
-            //endpoint.start();
-            //long start = System.nanoTime();
+            final Endpoint endpoint = getEndpoint2();
+            endpoint.start();
+            long start = System.nanoTime();
 
             RpcCallback callback = new RpcCallback() {
                 @Override
                 public void handler(RpcResponse response) {
-                    //long elapsed = System.nanoTime() - start;
-                    //endpoint.finish(0);
-                    //activeClient.decrementAndGet();
+                    long elapsed = System.nanoTime() - start;
+                    endpoint.finish(elapsed);
+                    activeClient.decrementAndGet();
 
                     byte[] result = response.getBytes();
                     ByteBuf buf = Unpooled.wrappedBuffer(
@@ -178,17 +178,15 @@ public class HttpAgent implements CommandLineRunner {
 
             int clients = activeClient.addAndGet(1);
 
-            double allQPS = 0;
-            for (Endpoint e : endpoints){
-                allQPS += e.qps();
-            }
-
-            for (Endpoint e : endpoints){
-                // 当前 active 负载小于按qps 所能承担的比重;
-                // 总qps 100, 当前 endpoint qps 10, 则应该分到 10% 的请求
-                if (e.getActive() < (clients * (e.qps() / allQPS))) {
-                    endpoint = e;
-                    break;
+            if (count % (endpoints.size() * 2) == endpoints.size()) {
+                // 最低 延迟
+                long minAvgLatency = Long.MAX_VALUE;
+                for (Endpoint e : endpoints) {
+                    long avgLatency = e.avgLatency();
+                    if (avgLatency < minAvgLatency) {
+                        minAvgLatency = avgLatency;
+                        endpoint = e;
+                    }
                 }
             }
 
